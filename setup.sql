@@ -75,7 +75,7 @@ $function$ language plpgsql;
 create or replace function create_student(
     roll_number varchar, student_name varchar, department varchar, 
     degree varchar, batch_year integer, contact varchar
-    ) 
+    )
 returns void as
 $function$
 begin
@@ -84,10 +84,10 @@ begin
                 (
                     course_code     varchar not null,
                     semester        integer not null,
-                    year            integer not null,
                     grade           varchar not null,
+                    year            integer not null,
                     foreign key (course_code) references academic_data.course_catalog (course_code)
-                );'
+            );'
         );
-end
+end;
 $function$ language plpgsql;
