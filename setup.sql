@@ -2,12 +2,14 @@
 drop schema if exists
     academic_data,
     course_offerings,
-    student_grades
+    student_grades,
+    registrations
     cascade;
 
 -- create the required schemas with tables and fill them some custom dummy data
 create schema academic_data;
 create schema course_offerings;
+create schema registrations; -- will contain information regarding student registration and tickets
 create schema student_grades;
 
 create table academic_data.departments
@@ -27,7 +29,6 @@ create table academic_data.degree
 );
 
 insert into academic_data.degree values('btech');
-insert into academic_data.degree values('mtech');
 
 create table academic_data.course_catalog
 (
@@ -72,10 +73,18 @@ begin
                     foreign key (course_code) references academic_data.course_catalog (course_code)
                 );'
         );
+    execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || '
+                (   
+                    roll_number     varchar not null,
+                    course_code     varchar primary key,
+                    foreign key (course_code) references academic_data.course_catalog (course_code),
+                    foreign key (roll_number) references academic_data.student_info (roll_number)
+                );'
+        );
+    
 end;
 $function$ language plpgsql;
 
--- roll number: 2019csb1286
 create or replace function student_grades.create_student(
     roll_number varchar, student_name varchar, department varchar, 
     degree varchar, batch_year integer, contact varchar
