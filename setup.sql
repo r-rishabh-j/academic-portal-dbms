@@ -61,8 +61,18 @@ create table academic_data.faculty_info
     foreign key (department) references academic_data.departments (dept_name)
 );
 
+create table academic_data.advisors
+(
+    faculty_id varchar primary key,
+    batch_names varchar[] default '{}', -- format batchyear, assumed to be of their own department
+    foreign key (faculty_id) references academic_data.faculty_info (faculty_id)
+);
+
 create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer) returns void as
 $function$
+declare faculty_cursor cursor for select faculty_id from academic_data.faculty_info;
+declare f_id academic_data.faculty_info.faculty_id%type
+declare advisor_f_id academic_data.faculty_info.faculty_id%type
 begin
     execute ('create table course_offerings.sem_' || academic_year || '_' || semester_number || '
                 (
@@ -81,6 +91,33 @@ begin
                     foreign key (roll_number) references academic_data.student_info (roll_number)
                 );'
         );
+    
+    open faculty_cursor;
+    loop
+    fetch faculty_cursor into f_id;
+    exit when not found;
+    execute ('create table registrations.faculty_ticket_'||f_id||'_'||academic_year||' '||semester_number||
+            ' (     
+                roll_number varchar not null,
+                course_code varchar not null,
+                foreign key (course_code) references academic_data.course_catalog (course_code),
+                foreign key (roll_number) references academic_data.student_info (roll_number)
+            )'
+        );
+    select f_table.faculty_id from academic_data.faculty_info as f_table into advisor_f_id where f_id=f_table.faculty_id;
+    if advisor_f_id != '' then
+    execute ('create table registrations.advisor_ticket_'||f_id||'_'||academic_year||' '||semester_number||
+            ' (     
+                roll_number varchar not null,
+                course_code varchar not null,
+                foreign key (course_code) references academic_data.course_catalog (course_code),
+                foreign key (roll_number) references academic_data.student_info (roll_number)
+            )'
+        );
+    end if;
+    end loop;
+    close faculty_cursor;
+    
     
 end;
 $function$ language plpgsql;
