@@ -16,6 +16,10 @@ create table academic_data.departments
 );
 
 insert into academic_data.departments values('cse');
+insert into academic_data.departments values('mcb');
+insert into academic_data.departments values('meb');
+insert into academic_data.departments values('ceb');
+insert into academic_data.departments values('chb');
 
 create table academic_data.degree
 (
@@ -23,6 +27,7 @@ create table academic_data.degree
 );
 
 insert into academic_data.degree values('btech');
+insert into academic_data.degree values('mtech');
 
 create table academic_data.course_catalog
 (
@@ -41,9 +46,7 @@ create table academic_data.student_info
     roll_number  varchar primary key,
     student_name varchar not null,
     department   varchar not null,
-    degree       varchar not null,
     batch_year   integer not null,
-    contact      varchar,
     foreign key (department) references academic_data.departments (dept_name),
     foreign key (degree) references academic_data.degree (degree)
 );
@@ -64,7 +67,7 @@ begin
                 (
                     course_code     varchar primary key,
                     instructors     varchar[] not null,
-                    slots           varchar[] not null,
+                    slot           varchar not null,
                     allowed_batches varchar[] not null,
                     foreign key (course_code) references academic_data.course_catalog (course_code)
                 );'
@@ -72,7 +75,8 @@ begin
 end;
 $function$ language plpgsql;
 
-create or replace function create_student(
+-- roll number: 2019csb1286
+create or replace function student_grades.create_student(
     roll_number varchar, student_name varchar, department varchar, 
     degree varchar, batch_year integer, contact varchar
     )
@@ -80,12 +84,12 @@ returns void as
 $function$
 begin
     insert into academic_data.student_info values (roll_number, student_name, department, degree, batch_year, contact);
-    execute ('create table student_grades.' || roll_number || '
+    execute ('create table student_grades.student_' || roll_number || '
                 (
                     course_code     varchar not null,
                     semester        integer not null,
-                    grade           varchar not null,
                     year            integer not null,
+                    grade           varchar not null default ''NA'',
                     foreign key (course_code) references academic_data.course_catalog (course_code)
             );'
         );
