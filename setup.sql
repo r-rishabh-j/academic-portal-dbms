@@ -158,16 +158,10 @@ begin
 end;
 $function$ language plpgsql;
 
-
--- wrong!
--- todo: implement this as an insert trigger on academic_data.student_info
---       to create a table for that student to their grades
-create or replace function student_grades.create_student(roll_number varchar, student_name varchar, department varchar,
-                                                         degree varchar, batch_year integer, contact varchar)
-    returns void as
+create or replace procedure create_empty_grade_sheet(roll_number varchar)
+    language plpgsql as
 $function$
 begin
-    insert into academic_data.student_info values (roll_number, student_name, department, degree, batch_year);
     execute ('create table student_grades.student_' || roll_number || '
                 (
                     course_code     varchar not null,
@@ -175,7 +169,15 @@ begin
                     year            integer not null,
                     grade           varchar not null default ''NA'',
                     foreign key (course_code) references academic_data.course_catalog (course_code)
-            );'
+            );' ||
+             'grant select on student_grades.student_' || roll_number ' to ' || roll_number || ';'
         );
 end;
-$function$ language plpgsql;
+$function$;
+
+-- todo: to be added to the dean actions later so that only dean's office creates new students
+create trigger add_empty_grade_sheet
+    after insert
+    on academic_data.student_info
+    for each row
+execute procedure create_empty_grade_sheet(new.roll_number);
