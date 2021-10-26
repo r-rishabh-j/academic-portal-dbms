@@ -86,7 +86,7 @@ begin
     execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || '
                 (   
                     roll_number     varchar not null,
-                    course_code     varchar primary key,
+                    course_code     varchar ,
                     foreign key (course_code) references academic_data.course_catalog (course_code),
                     foreign key (roll_number) references academic_data.student_info (roll_number)
                 );'
@@ -117,8 +117,7 @@ begin
     end if;
     end loop;
     close faculty_cursor;
-    
-    
+
 end;
 $function$ language plpgsql;
 
