@@ -328,17 +328,19 @@ $$ language plpgsql;
 create or replace function admin_data.create_registration_table() returns void as
 $function$
 declare
-    provisional_reg_table_cursor refcursor;
+    provisional_reg_cursor refcursor;
+    reg_table_row record;
     year integer;
     semester integer;
-    provisional_table table(
-        roll_number varchar,
-        course_id varchar
-        );
+--     provisional_table table(
+--         roll_number varchar,
+--         course_id varchar
+--         );
 begin
     -- iterate or provisional registration and dean ticket table
     select semester, year from academic_data.semester into semester, year;
-    execute ('select * from registrations.provisional_course_registrations_' || year || '_' || semester || ' into provisional_table');
-    
+
+
+
 end;
 $function$ language plpgsql;
