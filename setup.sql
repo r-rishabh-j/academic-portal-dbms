@@ -1,4 +1,13 @@
--- delete all previous schemas, tables and data to start off with a clean database
+/*
+ the aim of this file is to setup the schemas and tables,
+ create cleanup functions, startup functions and
+ populate the tables with some dummy data as well.
+ */
+
+
+/*
+ delete all previous schemas, tables and data to start off with a clean database
+ */
 drop schema if exists
     academic_data,
     course_offerings,
@@ -6,29 +15,35 @@ drop schema if exists
     registrations
     cascade;
 
--- create the required schemas with tables and fill them some custom dummy data
-create schema academic_data;
-create schema course_offerings;
-create schema registrations; -- will contain information regarding student registration and tickets
-create schema student_grades;
+/*
+ create the required schemas which will have tables and some custom dummy data
+ */
+create schema academic_data; -- for general academic data
+create schema course_offerings; -- for course offered in the particular semester and year
+create schema student_grades; -- for final grades of the student for all the courses taken to generate C.G.P.A.
+create schema registrations;
+-- will contain information regarding student registration and tickets
 
+-- five departments considered, can be scaled up easily
 create table academic_data.departments
 (
     dept_name varchar primary key
 );
+insert into academic_data.departments (dept_name)
+values ('cse'), -- computer science and engineering
+       ('mcb'), -- mathematics and computing
+       ('meb'), -- mechanical engineering
+       ('ceb'), -- civil engineering
+       ('chb') -- chemical engineering
+;
 
-insert into academic_data.departments values('cse');
-insert into academic_data.departments values('mcb');
-insert into academic_data.departments values('meb');
-insert into academic_data.departments values('ceb');
-insert into academic_data.departments values('chb');
-
+-- undergraduate curriculum implemented only
 create table academic_data.degree
 (
     degree varchar primary key
 );
-
-insert into academic_data.degree values('btech');
+insert into academic_data.degree
+values ('btech'); -- bachelors degree only
 
 create table academic_data.course_catalog
 (
@@ -41,6 +56,7 @@ create table academic_data.course_catalog
     introduced_on      date    not null,
     foreign key (dept_name) references academic_data.departments (dept_name)
 );
+-- todo: populate course catalog with dummy data from csv file
 
 create table academic_data.student_info
 (
@@ -48,9 +64,11 @@ create table academic_data.student_info
     student_name varchar not null,
     department   varchar not null,
     batch_year   integer not null,
+    degree       varchar default 'btech',
     foreign key (department) references academic_data.departments (dept_name),
     foreign key (degree) references academic_data.degree (degree)
 );
+-- todo: populate student info with dummy list of students from csv file
 
 create table academic_data.faculty_info
 (
@@ -60,30 +78,44 @@ create table academic_data.faculty_info
     contact      varchar,
     foreign key (department) references academic_data.departments (dept_name)
 );
+-- todo: populate faculty info with dummy list of faculties from csv file
 
-create table academic_data.advisors
+create table academic_data.advisers
 (
     faculty_id varchar primary key,
-    batch_names varchar[] default '{}', -- format batchyear, assumed to be of their own department
+    batches    integer[] default '{}', -- format batch_year, assumed to be of their own department
     foreign key (faculty_id) references academic_data.faculty_info (faculty_id)
 );
+-- todo: populate with some random faculties acting as advisers from available faculties
 
-create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer) returns void as
+create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer)
+    returns void as
 $function$
-declare faculty_cursor cursor for select faculty_id from academic_data.faculty_info;
-declare f_id academic_data.faculty_info.faculty_id%type
-declare advisor_f_id academic_data.faculty_info.faculty_id%type
+declare
+    -- iterator to run through all the faculties' ids
+    faculty_cursor cursor for select faculty_id
+                              from academic_data.faculty_info;
+    declare f_id         academic_data.faculty_info.faculty_id%type;
+    declare adviser_f_id academic_data.faculty_info.faculty_id%type;
 begin
+    -- assuming academic_year = 2021 and semester_number = 1
+    -- will create table course_offerings.sem_2021_1 which will store the courses being offered that semester
     execute ('create table course_offerings.sem_' || academic_year || '_' || semester_number || '
                 (
                     course_code     varchar primary key,
                     instructors     varchar[] not null,
-                    slot           varchar not null,
-                    allowed_batches varchar[] not null,
+                    slot            varchar not null,
+                    allowed_batches varchar[] not null, -- will be combination of batch_year and department: cse_2021
                     foreign key (course_code) references academic_data.course_catalog (course_code)
                 );'
         );
-    execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || '
+    -- will create table registrations.provisional_course_registrations_2021_1
+    -- to be deleted after registration window closes
+    -- to store the list of students interest in taking that course in that semester
+    -- whether to allow or not depends on various factors and
+    -- if accepted, then will be saved to registrations.{course_code}_2021_1
+    execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' ||
+             semester_number || '
                 (   
                     roll_number     varchar not null,
                     course_code     varchar primary key,
@@ -91,45 +123,50 @@ begin
                     foreign key (roll_number) references academic_data.student_info (roll_number)
                 );'
         );
-    
+
     open faculty_cursor;
     loop
-    fetch faculty_cursor into f_id;
-    exit when not found;
-    execute ('create table registrations.faculty_ticket_'||f_id||'_'||academic_year||' '||semester_number||
-            ' (     
-                roll_number varchar not null,
-                course_code varchar not null,
-                foreign key (course_code) references academic_data.course_catalog (course_code),
-                foreign key (roll_number) references academic_data.student_info (roll_number)
-            )'
-        );
-    select f_table.faculty_id from academic_data.faculty_info as f_table into advisor_f_id where f_id=f_table.faculty_id;
-    if advisor_f_id != '' then
-    execute ('create table registrations.advisor_ticket_'||f_id||'_'||academic_year||' '||semester_number||
-            ' (     
-                roll_number varchar not null,
-                course_code varchar not null,
-                foreign key (course_code) references academic_data.course_catalog (course_code),
-                foreign key (roll_number) references academic_data.student_info (roll_number)
-            )'
-        );
-    end if;
+        fetch faculty_cursor into f_id;
+        exit when not found;
+        -- store the tickets for a faculty in that particular semester
+        execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' ||
+                 semester_number ||
+                 ' (
+                     roll_number varchar not null,
+                     course_code varchar not null,
+                     foreign key (course_code) references academic_data.course_catalog (course_code),
+                     foreign key (roll_number) references academic_data.student_info (roll_number)
+                 )'
+            );
+        -- check if that faculty is also an adviser
+        select f_id from academic_data.advisers where f_id = academic_data.advisers.faculty_id into adviser_f_id;
+        if adviser_f_id != '' then
+            -- store the tickets for a adviser in that particular semester
+            execute ('create table registrations.adviser_ticket_' || f_id || '_' || academic_year || ' ' ||
+                     semester_number ||
+                     ' (
+                         roll_number varchar not null,
+                         course_code varchar not null,
+                         foreign key (course_code) references academic_data.course_catalog (course_code),
+                         foreign key (roll_number) references academic_data.student_info (roll_number)
+                     )'
+                );
+        end if;
     end loop;
     close faculty_cursor;
-    
-    
 end;
 $function$ language plpgsql;
 
-create or replace function student_grades.create_student(
-    roll_number varchar, student_name varchar, department varchar, 
-    degree varchar, batch_year integer, contact varchar
-    )
-returns void as
+
+-- wrong!
+-- todo: implement this as an insert trigger on academic_data.student_info
+--       to create a table for that student to their grades
+create or replace function student_grades.create_student(roll_number varchar, student_name varchar, department varchar,
+                                                         degree varchar, batch_year integer, contact varchar)
+    returns void as
 $function$
 begin
-    insert into academic_data.student_info values (roll_number, student_name, department, degree, batch_year, contact);
+    insert into academic_data.student_info values (roll_number, student_name, department, degree, batch_year);
     execute ('create table student_grades.student_' || roll_number || '
                 (
                     course_code     varchar not null,
