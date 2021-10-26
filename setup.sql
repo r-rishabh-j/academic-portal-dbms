@@ -39,14 +39,16 @@ create table academic_data.semester
     primary key (semester, year)
 );
 
+
 grant select on academic_data.semester to PUBLIC;
 
 insert into academic_data.departments (dept_name)
 values ('cse'), -- computer science and engineering
-       ('mcb'), -- mathematics and computing
-       ('meb'), -- mechanical engineering
-       ('ceb'), -- civil engineering
-       ('chb') -- chemical engineering
+       ('me'), -- mechanical engineering
+       ('ee'), -- civil engineering
+       ('ge'), -- general
+       ('sc'), -- sciences
+       ('hs') -- humanities
 ;
 
 -- undergraduate curriculum implemented only
@@ -89,13 +91,20 @@ create table academic_data.faculty_info
 );
 -- todo: populate faculty info with dummy list of faculties from csv file
 
-create table academic_data.advisers
+-- create table academic_data.advisers
+-- (
+--     faculty_id varchar primary key,
+--     batches    integer[] default '{}', -- format batch_year, assumed to be of their own department
+--     foreign key (faculty_id) references academic_data.faculty_info (faculty_id)
+-- );
+create table academic_data.ug_batches
 (
-    faculty_id varchar primary key,
-    batches    integer[] default '{}', -- format batch_year, assumed to be of their own department
-    foreign key (faculty_id) references academic_data.faculty_info (faculty_id)
+    dept_name varchar,
+    batch_year integer,
+    adviser_f_id varchar
+    PRIMARY KEY (dept_name, batch_year)
 );
--- todo: populate with some random faculties acting as advisers from available faculties
+-- TODO: populate with some random faculties acting as advisers from available faculties
 
 create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer)
     returns void as
@@ -185,7 +194,7 @@ begin
         execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' ||semester_number ||' to '||f_id||';');
         execute('grant insert on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||f_id||';');
         -- check if that faculty is also an adviser
-        select f_id from academic_data.advisers where f_id = academic_data.advisers.faculty_id into adviser_f_id;
+        select academic_data.ug_batches.adviser_f_id from academic_data.ug_batches where f_id = academic_data.ug_batches.adviser_f_id into adviser_f_id;
         if adviser_f_id != '' then
             -- store the tickets for a adviser in that particular semester
             execute ('create table registrations.adviser_ticket_' || f_id || '_' || academic_year || ' ' ||
@@ -240,7 +249,6 @@ create or replace procedure admin_data.create_faculty(faculty_id varchar)
     language plpgsql as
 $function$
 declare
-    f_id 
 begin
     create user faculty_id password faculty_id;
     grant select on academic_data.course_catalog to faculty_id;
@@ -256,3 +264,61 @@ create trigger generate_faculty_record
     on academic_data.faculty_info
     for each row
 execute procedure admin_data.create_faculty(new.faculty_id);
+
+-- get the credit limit for a given roll number
+create or replace function get_credit_limit(roll_number varchar)
+    returns real as
+$$
+declare
+    grades_list         table
+                        (
+                            course_code varchar,
+                            semester    integer,
+                            year        integer,
+                            grade       integer
+                        );
+    current_semester    integer;
+    current_year        integer;
+    course_code         varchar;
+    courses_to_consider varchar[];
+    credits_taken       real;
+begin
+    execute ('select * from student_grades.student_' || roll_number || ' into grades_list;');
+    select semester from academic_data.semester into current_semester;
+    select year from academic_data.semester into current_year;
+    if current_semester = 2
+    then
+        -- even semester
+        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
+                                                                 from grades_list
+                                                                 where grades_list.semester = 1
+                                                                   and grades_list.year = current_year));
+        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
+                                                                 from grades_list
+                                                                 where grades_list.semester = 2
+                                                                   and grades_list.year = current_year - 1));
+    else
+        -- odd semester
+        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
+                                                                 from grades_list
+                                                                 where grades_list.semester = 1
+                                                                   and grades_list.year = current_year - 1));
+        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
+                                                                 from grades_list
+                                                                 where grades_list.semester = 2
+                                                                   and grades_list.year = current_year - 1));
+    end if;
+    credits_taken = 0;
+    foreach course_code in array courses_to_consider
+        loop
+            credits_taken = credits_taken + (select academic_data.course_catalog.credits
+                                             where academic_data.course_catalog.course_code = course_code);
+        end loop;
+    if credits_taken = 0
+    then
+        return 20;  -- default credit limit
+    else
+        return (credits_taken * 1.25) / 2; -- calculated credit limit
+    end if;
+end;
+$$ language plpgsql;

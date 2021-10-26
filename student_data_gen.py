@@ -11,7 +11,7 @@ import random
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-def generate_student_data(num_students_per_branch=10, branches = ["cse", "mnc", "meb"], batches = ['2020', '2019', '2018', '2017']):
+def generate_student_data(num_students_per_branch=10, branches = ["cse", "ee", "me"], batches = ['2020', '2019', '2018', '2017']):
     def generate_batch(num_students_per_branch, years):
         # per branch equal students
         batch = [[],[],[],[]]
@@ -19,7 +19,7 @@ def generate_student_data(num_students_per_branch=10, branches = ["cse", "mnc", 
             for branch in branches:
                 branch_id = 1
                 for student in range(num_students_per_branch):
-                    batch[0].append(year+branch+format(branch_id,'04d'))
+                    batch[0].append(branch+'_'+year+'_'+format(branch_id,'04d'))
                     branch_id+=1
                     batch[1].append(id_generator(7, string.ascii_uppercase))
                     batch[2].append(branch)
