@@ -168,7 +168,8 @@ begin
                     year            integer not null,
                     grade           varchar not null default ''NA'',
                     foreign key (course_code) references academic_data.course_catalog (course_code)
-            );'
+            );' ||
+             'grant select on student_grades.student_' || roll_number ' to ' || roll_number || ';'
         );
 end;
 $function$;
