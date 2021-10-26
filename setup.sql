@@ -101,7 +101,7 @@ create table academic_data.ug_batches
 (
     dept_name varchar,
     batch_year integer,
-    adviser_f_id varchar
+    adviser_f_id varchar,
     PRIMARY KEY (dept_name, batch_year)
 );
 -- TODO: populate with some random faculties acting as advisers from available faculties
@@ -115,7 +115,7 @@ declare
                               from academic_data.faculty_info;
     declare f_id         academic_data.faculty_info.faculty_id%type;
     declare adviser_f_id academic_data.faculty_info.faculty_id%type;
-    declare student_cursor for select roll_number from academic_info.student_info;
+    student_cursor cursor for select roll_number from academic_data.student_info;
     declare s_rollnumber academic_data.student_info.roll_number%type;
 begin
     -- assuming academic_year = 2021 and semester_number = 1
@@ -219,7 +219,8 @@ create or replace procedure admin_data.create_student(roll_number varchar)
     language plpgsql as
 $function$
 begin
-    create user roll_number password roll_number;
+--     create user roll_number password roll_number;
+    execute format('create user %I password %L', roll_number, roll_number);
     execute ('create table student_grades.student_' || roll_number || '
                 (
                     course_code     varchar not null,
@@ -250,7 +251,8 @@ create or replace procedure admin_data.create_faculty(faculty_id varchar)
 $function$
 declare
 begin
-    create user faculty_id password faculty_id;
+--     create user faculty_id password faculty_id;
+    execute format('create user %I password %L', faculty_id, faculty_id);
     grant select on academic_data.course_catalog to faculty_id;
     grant select on academic_data.student_info to faculty_id;
     grant select on academic_data.faculty_info to faculty_id;
@@ -322,3 +324,21 @@ begin
     end if;
 end;
 $$ language plpgsql;
+
+create or replace function admin_data.create_registration_table() returns void as
+$function$
+declare
+    provisional_reg_table_cursor refcursor;
+    year integer;
+    semester integer;
+    provisional_table table(
+        roll_number varchar,
+        course_id varchar
+        );
+begin
+    -- iterate or provisional registration and dean ticket table
+    select semester, year from academic_data.semester into semester, year;
+    execute ('select * from registrations.provisional_course_registrations_' || year || '_' || semester || ' into provisional_table');
+    
+end;
+$function$ language plpgsql;
