@@ -7,15 +7,18 @@ departments = ['cse', 'me', 'ee']
 
 rows = []
 num_rows = 100 
+faculty_id = 1
 
 for i in range(num_rows):
     record = []
-    record.append(random.choice(departments) + ''.join(random.choice(string.digits) for _ in range(4)))
+    branch = random.choice(departments)
+    record.append(branch + '_' + format(faculty_id, '04d'))
+    faculty_id += 1
     record.append(''.join(random.choice(string.ascii_uppercase) for _ in range(8)))
-    record.append(random.choice(departments))
+    record.append(branch)
     rows.append(record)
 
-with open('faculty_info.csv', 'w') as csvfile:
+with open('faculty_info.csv', 'w', newline = '') as csvfile:
     csvwriter = csv.writer(csvfile)
     csvwriter.writerow(fields)
     csvwriter.writerows(rows)
