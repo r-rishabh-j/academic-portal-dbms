@@ -159,6 +159,7 @@ begin
                     instructors     varchar[] not null,
                     slot            varchar,
                     allowed_batches varchar[] not null, -- will be combination of batch_year and department: cse_2021
+                    cgpa_req        real default 0,
                     foreign key (course_code) references academic_data.course_catalog (course_code)
                 );'
         );
@@ -173,10 +174,15 @@ begin
     execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || '
                 (   
                     roll_number     varchar not null,
-                    course_code     varchar ,
+                    course_code     varchar,
                     foreign key (course_code) references academic_data.course_catalog (course_code),
                     foreign key (roll_number) references academic_data.student_info (roll_number)
-                );'
+                );' ||
+             'create trigger ensure_valid_registration
+                before insert
+                on registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || '
+                for each row
+             execute function check_register_for_course();'
         );
 
     open student_cursor;
@@ -189,7 +195,7 @@ begin
     end loop;
     close student_cursor;
 
-    execute('create table admin_data.dean_tickets_'||academic_year||'_'||semester_number||
+    execute('create table registrations.dean_tickets_'||academic_year||'_'||semester_number||
        ' roll_number varchar not null,
         course_code varchar not null,
         dean_decision boolean,
@@ -425,7 +431,7 @@ begin
             select adviser_f_id from academic_data.ug_batches where dept_name=st_dept and batch_year=st_year into adv_id;
             execute format('select status from registrations.adviser_ticket_'||adv_id||'_'||yr||'_'||sem||' where roll_number=''%s'' and course_code=''%s'';',
                 row.roll_number,row.course_code) into advisor_permission;
-            execute format($d$insert into admin_data.dean_tickets_'||yr||'_'||sem||' values('%s','%s',%s,%s,%s);$d$,row.roll_number, row.course_code, null, faculty_permission, advisor_permission);
+            execute format($d$insert into registrations.dean_tickets_'||yr||'_'||sem||' values('%s','%s',%s,%s,%s);$d$,row.roll_number, row.course_code, null, faculty_permission, advisor_permission);
         end loop;
     end loop;
 end;
@@ -473,7 +479,7 @@ tbl_name varchar;
 begin
     select current_user into f_id;
     select semester, year from academic_data.semester into sem, yr;
-    tbl_name:=format('admin_data.dean_tickets_%s_%s', yr, sem);
+    tbl_name:=format('registrations.dean_tickets_%s_%s', yr, sem);
     execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
     if new_status=true then
         execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, stu_rollnumber);
