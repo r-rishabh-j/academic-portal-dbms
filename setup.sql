@@ -91,12 +91,6 @@ create table academic_data.faculty_info
 );
 -- todo: populate faculty info with dummy list of faculties from csv file
 
--- create table academic_data.advisers
--- (
---     faculty_id varchar primary key,
---     batches    integer[] default '{}', -- format batch_year, assumed to be of their own department
---     foreign key (faculty_id) references academic_data.faculty_info (faculty_id)
--- );
 create table academic_data.ug_batches
 (
     dept_name varchar,
@@ -105,6 +99,32 @@ create table academic_data.ug_batches
     PRIMARY KEY (dept_name, batch_year)
 );
 -- TODO: populate with some random faculties acting as advisers from available faculties
+
+create procedure course_offerings.create_registration_table(course_code varchar, faculty_ids varchar[]) language plpgsql
+as
+$$
+declare
+semester integer;
+year integer;
+f_id varchar;
+curr_user varchar;
+begin
+    select semester, year from academic_data.semester into semester, year;
+    execute('create table registrations.'||course_code||'_'||year||'_'||semester||' '||
+    '(
+        roll_number varchar not null,
+        grade integer default 0,
+        foreign key(roll_number) references academic_data.student_info
+    );');
+    select current_user into curr_user;
+    for each f_id in array faculty_ids
+    loop
+        if f_id=curr_user then continue;
+        end if;
+        execute('grant select, update on registrations.'||course_code||'_'||year||'_'||semester||' to '||f_id||';');
+    end loop;
+end;
+$$;
 
 create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer)
     returns void as
@@ -129,7 +149,9 @@ begin
                     foreign key (course_code) references academic_data.course_catalog (course_code)
                 );'
         );
-
+    execute('create trigger course_offerings.trigger_sem_'||academic_year||'_'||semester_number||
+    'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute procedure 
+    course_offerings.create_registration_table(new.course_code, new.instructors);');
     -- will create table registrations.provisional_course_registrations_2021_1
     -- to be deleted after registration window closes
     -- to store the list of students interest in taking that course in that semester
@@ -345,11 +367,5 @@ begin
     loop
     execute('insert into registrations.'||row.course_code||'_'||year||'_'||semester||' '||'values('||row.roll_number||', 0);'); -- roll_number, grade
     end loop;
-
-    -- for row in execute format('select course_code from %I group by course_code', prov_regtable)
-    -- loop
-
-    -- execute('select instructors from course_offerings.sem_'||year||'_'||semester||' where course_code='''||row.course_code||''';') into faculty_list;
-    -- end loop;
 end;
 $function$ language plpgsql;
