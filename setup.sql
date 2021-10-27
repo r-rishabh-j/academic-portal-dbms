@@ -155,6 +155,7 @@ begin
     execute ('create table course_offerings.sem_' || academic_year || '_' || semester_number || '
                 (
                     course_code     varchar primary key,
+                    course_coordinator varchar not null, -- tickets to be sent to course coordinator only
                     instructors     varchar[] not null,
                     slot            varchar,
                     allowed_batches varchar[] not null, -- will be combination of batch_year and department: cse_2021
