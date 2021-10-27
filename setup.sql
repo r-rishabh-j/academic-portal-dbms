@@ -109,7 +109,7 @@ year integer;
 f_id varchar;
 curr_user varchar;
 begin
-    select semester, year from academic_data.semester into semester, year;
+    select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
     execute('create table registrations.'||course_code||'_'||year||'_'||semester||' '||
     '(
         roll_number varchar not null,
@@ -360,10 +360,10 @@ declare
     faculty_list varchar[];
 begin
     -- iterate or provisional registration and dean ticket table
-    select semester, year from academic_data.semester into semester, year;
+    select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
     prov_regtable := 'registrations.provisional_course_registrations_' || year || '_' || semester||' ';
 
-    for row in execute format('select * from %I', prov_regtable);
+    for row in execute format('select * from %I;', prov_regtable);
     loop
     execute('insert into registrations.'||row.course_code||'_'||year||'_'||semester||' '||'values('||row.roll_number||', 0);'); -- roll_number, grade
     end loop;
