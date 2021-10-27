@@ -316,45 +316,49 @@ create trigger generate_faculty_record
 execute function admin_data.create_faculty();
 
 -- get the credit limit for a given roll number
+create or replace function get_grades_list(roll_number varchar)
+returns table (
+    course_code varchar,
+    semester    integer,
+    year        integer,
+    grade       integer
+) as
+$$
+begin
+    return query execute(format('select * from student_grades.student_%s', roll_number));
+end;
+$$ language plpgsql;
+
 create or replace function get_credit_limit(roll_number varchar)
     returns real as
 $$
 declare
-    grades_list         table
-                        (
-                            course_code varchar,
-                            semester    integer,
-                            year        integer,
-                            grade       integer
-                        );
     current_semester    integer;
     current_year        integer;
     course_code         varchar;
     courses_to_consider varchar[];
     credits_taken       real;
 begin
-    execute ('select * from student_grades.student_' || roll_number || ' into grades_list;');
-    select semester from academic_data.semester into current_semester;
-    select year from academic_data.semester into current_year;
+    select semester, year from academic_data.semester into current_semester, current_year;
     if current_semester = 2
     then
         -- even semester
         courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
-                                                                 from grades_list
+                                                                 from get_grades_list(roll_number) as grades_list
                                                                  where grades_list.semester = 1
                                                                    and grades_list.year = current_year));
         courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
-                                                                 from grades_list
+                                                                 from get_grades_list(roll_number) as grades_list
                                                                  where grades_list.semester = 2
                                                                    and grades_list.year = current_year - 1));
     else
         -- odd semester
         courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
-                                                                 from grades_list
+                                                                 from get_grades_list(roll_number) as grades_list
                                                                  where grades_list.semester = 1
                                                                    and grades_list.year = current_year - 1));
         courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
-                                                                 from grades_list
+                                                                 from get_grades_list(roll_number) as grades_list
                                                                  where grades_list.semester = 2
                                                                    and grades_list.year = current_year - 1));
     end if;
