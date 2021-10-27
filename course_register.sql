@@ -1,16 +1,17 @@
 -- check prerequisites requirements
-create or replace function check_prerequisites(roll_number varchar, course_code varchar)
+create or replace function check_prerequisites(roll_number varchar, course_id varchar)
 returns boolean as
 $$
 declare
     found boolean;
     requirement varchar;
+    course record;
     pre_requisites varchar[];
 begin
 
-    select pre_requisities
+    select academic_data.course_catalog.pre_requisities
     from academic_data.course_catalog
-    where academic_data.course_catalog.course_code = course_code
+    where academic_data.course_catalog.course_code = course_id
     into pre_requisites;
 
     if pre_requisites = '{}'
@@ -30,11 +31,12 @@ begin
             then return false;
         end if;
     end loop;
+    return true;
 end;
 $$ language plpgsql;
 
 -- check allowed batches
-create or replace function check_allowed_batches(roll_number varchar, course_code varchar)
+create or replace function check_allowed_batches(roll_num varchar, course_code varchar)
 returns boolean as
 $$
 declare
@@ -50,7 +52,7 @@ begin
 
     select batch_year
     from academic_data.student_info
-    where academic_data.student_info.roll_number = roll_number
+    where academic_data.student_info.roll_number = roll_num
     into student_batch;
 
     execute(format('select allowed_batches from course_offerings.sem_%s_%s where course_code=''%s'';',
@@ -123,7 +125,7 @@ begin
     for course in execute ('select * from student_grades.student_' || roll_number || ';')
     loop
         if course.grade != 0 then
-            select credits from academic_data.course_catalog where course_code = course.course_code into course_cred;
+            select credits from academic_data.course_catalog where academic_data.course_catalog.course_code = course.course_code into course_cred;
             scored := scored + course_cred * course.grade;
             total_credits := total_credits + course_cred;
         end if;

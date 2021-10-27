@@ -3,7 +3,6 @@ as
 $$
 begin
     execute format('copy academic_data.student_info from ''%s'' delimiter '','' csv header;', stu_filename);
---     copy academic_data.student_info from stu_filename delimiter ',' csv header;
 end;
 $$ language plpgsql;
 
@@ -12,6 +11,13 @@ as
 $$
 begin
     execute format('copy academic_data.faculty_info from ''%s'' delimiter '','' csv header;', f_filename);
---     copy academic_data.faculty_info from f_filename delimiter ',' csv header;
+end;
+
+$$ language plpgsql;
+create or replace procedure admin_data.load_advisers(a_filename text)
+as
+$$
+begin
+    execute format('copy academic_data.advisers from ''%s'' delimiter '','' csv header;', a_filename);
 end;
 $$ language plpgsql;

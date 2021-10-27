@@ -23,9 +23,14 @@ drop schema if exists
 create schema academic_data; -- for general academic data
 create schema admin_data;
 create schema faculty_actions;
-create schema course_offerings; -- for course offered in the particular semester and year
+create schema advisor_actions;
 create schema student_grades; -- for final grades of the student for all the courses taken to generate C.G.P.A.
+create schema course_offerings; -- for course offered in the particular semester and year
 create schema registrations;
+grant select on all tables in schema registrations to public;
+grant select on all tables in schema course_offerings to public;
+grant select on all tables in schema academic_data to public;
+grant usage on schema student_grades to public;
 -- will contain information regarding student registration and tickets
 
 -- five departments considered, can be scaled up easily
@@ -106,6 +111,14 @@ create table academic_data.ug_batches
 );
 -- TODO: populate with some random faculties acting as advisers from available faculties
 
+create table academic_data.advisers 
+(
+    adviser_f_id varchar not null,
+    batch_dept varchar,
+    batch_year integer,
+    foreign key (adviser_f_id) references academic_data.faculty_info(faculty_id)
+);
+
 create table academic_data.timetable_slots
 (
     slot_name varchar primary key
@@ -176,7 +189,8 @@ begin
                     roll_number     varchar not null,
                     course_code     varchar,
                     foreign key (course_code) references academic_data.course_catalog (course_code),
-                    foreign key (roll_number) references academic_data.student_info (roll_number)
+                    foreign key (roll_number) references academic_data.student_info (roll_number),
+                    primary key (roll_number, course_code)
                 );' ||
              'create trigger ensure_valid_registration
                 before insert
@@ -202,7 +216,8 @@ begin
         faculty_decision boolean,
         adviser_decision boolean,
         foreign key (course_code) references academic_data.course_catalog (course_code),
-        foreign key (roll_number) references academic_data.student_info (roll_number)
+        foreign key (roll_number) references academic_data.student_info (roll_number),
+        primary key (roll_number, course_code)
     ');
 
     open faculty_cursor;
@@ -217,7 +232,8 @@ begin
                      course_code varchar not null,
                      status boolean,
                      foreign key (course_code) references academic_data.course_catalog (course_code),
-                     foreign key (roll_number) references academic_data.student_info (roll_number)
+                     foreign key (roll_number) references academic_data.student_info (roll_number),
+                    primary key (roll_number, course_code)
                  )'
             );
         execute('grant select on registrations.student_ticket_'||academic_year||'_'||semester_number||' to '||f_id||';');
@@ -241,7 +257,8 @@ begin
                          course_code varchar not null,
                          status boolean,
                          foreign key (course_code) references academic_data.course_catalog (course_code),
-                         foreign key (roll_number) references academic_data.student_info (roll_number)
+                         foreign key (roll_number) references academic_data.student_info (roll_number),
+                        primary key (roll_number, course_code)
                      )'
                 );
             execute('grant all privileges on registrations.adviser_ticket_' || f_id || '_' || academic_year || ' ' ||semester_number ||' to '||f_id||';');
@@ -275,10 +292,10 @@ begin
             );' ||
              'grant select on student_grades.student_' || new.roll_number || ' to ' || new.roll_number || ';'
         );
-    execute format('grant select on academic_data.course_catalog to %s;', new.roll_number);
-    execute format('grant select on academic_data.student_info to %s;', new.roll_number);
-    execute format('grant select on academic_data.faculty_info to %s;', new.roll_number);
-    execute format('grant select on academic_data.departments to %s;', new.roll_number);
+    -- execute format('grant select on academic_data.course_catalog to %s;', new.roll_number);
+    -- execute format('grant select on academic_data.student_info to %s;', new.roll_number);
+    -- execute format('grant select on academic_data.faculty_info to %s;', new.roll_number);
+    -- execute format('grant select on academic_data.departments to %s;', new.roll_number);
 --
 --     grant select on academic_data.course_catalog to new.roll_number;
 --     grant select on academic_data.student_info to new.roll_number;
@@ -303,10 +320,12 @@ declare
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, new.faculty_id);
-    execute format('grant select on academic_data.course_catalog to %s;', new.faculty_id);
-    execute format('grant select on academic_data.student_info to %s;', new.faculty_id);
-    execute format('grant select on academic_data.faculty_info to %s;', new.faculty_id);
-    execute format('grant select on academic_data.departments to %s;', new.faculty_id);
+    -- execute format('grant select on academic_data.course_catalog to %s;', new.faculty_id);
+    -- execute format('grant select on academic_data.student_info to %s;', new.faculty_id);
+    -- execute format('grant select on academic_data.faculty_info to %s;', new.faculty_id);
+    -- execute format('grant select on academic_data.departments to %s;', new.faculty_id);
+    execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
+    execute format('grant select on tables in schema student_grades to %s;', new.faculty_id);
     return new;
 --     grant select on academic_data.student_info to faculty_id;
 --     grant select on academic_data.faculty_info to faculty_id;
@@ -320,6 +339,34 @@ create trigger generate_faculty_record
     on academic_data.faculty_info
     for each row
 execute function admin_data.create_faculty();
+
+-- creating a faculty
+create or replace function admin_data.create_adviser() returns trigger
+as
+$function$
+declare
+begin
+--     create user faculty_id password faculty_id;
+    execute format('create user %I password %L;', new.adviser_f_id, new.adviser_f_id);
+    -- execute format('grant select on academic_data.course_catalog to %s;', new.adviser_f_id);
+    -- execute format('grant select on academic_data.student_info to %s;', new.adviser_f_id);
+    -- execute format('grant select on academic_data.faculty_info to %s;', new.adviser_f_id);
+    -- execute format('grant select on academic_data.departments to %s;', new.adviser_f_id);
+    execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_f_id);
+    execute format('grant select on tables in schema student_grades to %s;', new.adviser_f_id);
+    return new;
+--     grant select on academic_data.student_info to faculty_id;
+--     grant select on academic_data.faculty_info to faculty_id;
+--     grant select on academic_data.departments to faculty_id;
+end;
+$function$ language plpgsql ;
+
+-- todo: to be added to the dean actions later so that only dean's office creates new students
+create trigger generate_faculty_record
+    after insert
+    on academic_data.faculty_info
+    for each row
+execute function admin_data.create_adviser();
 
 -- get the credit limit for a given roll number
 create or replace function get_grades_list(roll_number varchar)
@@ -431,7 +478,7 @@ begin
             select adviser_f_id from academic_data.ug_batches where dept_name=st_dept and batch_year=st_year into adv_id;
             execute format('select status from registrations.adviser_ticket_'||adv_id||'_'||yr||'_'||sem||' where roll_number=''%s'' and course_code=''%s'';',
                 row.roll_number,row.course_code) into advisor_permission;
-            execute format($d$insert into registrations.dean_tickets_'||yr||'_'||sem||' values('%s','%s',%s,%s,%s);$d$,row.roll_number, row.course_code, null, faculty_permission, advisor_permission);
+            execute format($d$insert into registrations.dean_tickets_%s_%s values('%s','%s',%s,%s,%s);$d$,yr, sem, row.roll_number, row.course_code, null, faculty_permission, advisor_permission);
         end loop;
     end loop;
 end;
