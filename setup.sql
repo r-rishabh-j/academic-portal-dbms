@@ -27,8 +27,11 @@ create schema advisor_actions;
 create schema student_grades; -- for final grades of the student for all the courses taken to generate C.G.P.A.
 create schema course_offerings; -- for course offered in the particular semester and year
 create schema registrations;
+grant usage on schema registrations to public;
 grant select on all tables in schema registrations to public;
+grant usage on schema course_offerings to public;
 grant select on all tables in schema course_offerings to public;
+grant usage on schema academic_data to public;
 grant select on all tables in schema academic_data to public;
 grant usage on schema student_grades to public;
 -- will contain information regarding student registration and tickets
@@ -63,8 +66,9 @@ values ('cse'), -- computer science and engineering
 create table academic_data.degree
 (
     degree varchar primary key,
-    program_electives integer,
-    open_electives integer
+    program_electives_credits integer,
+    open_electives_credits integer,
+    primary key(degree)
 );
 insert into academic_data.degree
 values ('btech', 6, 18); -- bachelors degree only
@@ -77,7 +81,8 @@ create table academic_data.course_catalog
     credit_structure   varchar not null,
     course_description varchar   default '',
     pre_requisites     varchar[] default '{}',
-    foreign key (dept_name) references academic_data.departments (dept_name)
+    foreign key (dept_name) references academic_data.departments (dept_name),
+    primary key(course_code)
 );
 
 -- todo: populate course catalog with dummy data from csv file
@@ -88,7 +93,8 @@ create table academic_data.student_info
     department   varchar not null,
     batch_year   integer not null,
     foreign key (department) references academic_data.departments (dept_name),
-    foreign key (degree) references academic_data.degree (degree)
+    foreign key (degree) references academic_data.degree (degree),
+    primary key(roll_number)
 );
 -- todo: populate student info with dummy list of students from csv file
 
@@ -97,7 +103,8 @@ create table academic_data.faculty_info
     faculty_id   varchar primary key,
     faculty_name varchar not null,
     department   varchar not null,
-    foreign key (department) references academic_data.departments (dept_name)
+    foreign key (department) references academic_data.departments (dept_name),
+    primary key(faculty_id)
 );
 -- todo: populate faculty info with dummy list of faculties from csv file
 
@@ -111,12 +118,13 @@ create table academic_data.ug_batches
 );
 -- TODO: populate with some random faculties acting as advisers from available faculties
 
-create table academic_data.advisers 
+create table academic_data.adviser_info 
 (
-    adviser_f_id varchar not null,
+    adviser_id varchar not null,
     batch_dept varchar,
     batch_year integer,
-    foreign key (adviser_f_id) references academic_data.faculty_info(faculty_id)
+    foreign key (adviser_f_id) references academic_data.faculty_info(faculty_id),
+    primary key(adviser_f_id)
 );
 
 create table academic_data.timetable_slots
@@ -151,16 +159,17 @@ begin
 end;
 $$language plpgsql;
 
-create or replace function course_offerings.add_new_semester(academic_year integer, semester_number integer)
+------------------------------------------------------------------------------------------------------------------------------------------------
+create or replace function admin_data.add_new_semester(academic_year integer, semester_number integer)
     returns void as
 $function$
 declare
     -- iterator to run through all the faculties' ids
-    faculty_cursor cursor for select faculty_id
-                              from academic_data.faculty_info;
-    declare f_id         academic_data.faculty_info.faculty_id%type;
-    declare adviser_f_id academic_data.faculty_info.faculty_id%type;
+    faculty_cursor cursor for select faculty_id from academic_data.faculty_info;
+    adviser_cursor cursor for select adviser_id from academic_data.adviser_info;
     student_cursor cursor for select roll_number from academic_data.student_info;
+    declare f_id         academic_data.faculty_info.faculty_id%type;
+    declare adviser_f_id academic_data.adviser_info.adviser_id%type;
     declare s_rollnumber academic_data.student_info.roll_number%type;
 begin
     -- assuming academic_year = 2021 and semester_number = 1
@@ -177,7 +186,7 @@ begin
                 );'
         );
     execute('create trigger course_offerings.trigger_sem_'||academic_year||'_'||semester_number||
-    'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute procedure
+    'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute function
     course_offerings.create_registration_table();');
     -- will create table registrations.provisional_course_registrations_2021_1
     -- to be deleted after registration window closes
@@ -209,8 +218,8 @@ begin
     end loop;
     close student_cursor;
 
-    execute('create table registrations.dean_tickets_'||academic_year||'_'||semester_number||
-       ' roll_number varchar not null,
+    execute('create table registrations.dean_tickets_'||academic_year||'_'||semester_number||' '||
+       'roll_number varchar not null,
         course_code varchar not null,
         dean_decision boolean,
         faculty_decision boolean,
@@ -225,15 +234,14 @@ begin
         fetch faculty_cursor into f_id;
         exit when not found;
         -- store the tickets for a faculty in that particular semester
-        execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' ||
-                 semester_number ||
-                 ' (
+        execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' || semester_number ||' '||
+                 '(
                      roll_number varchar not null,
                      course_code varchar not null,
                      status boolean,
                      foreign key (course_code) references academic_data.course_catalog (course_code),
                      foreign key (roll_number) references academic_data.student_info (roll_number),
-                    primary key (roll_number, course_code)
+                     primary key (roll_number, course_code)
                  )'
             );
         execute('grant select on registrations.student_ticket_'||academic_year||'_'||semester_number||' to '||f_id||';');
@@ -246,36 +254,41 @@ begin
             execute format('grant insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||' to '||s_rollnumber||';');
         end loop;
         close student_cursor;
-        -- check if that faculty is also an adviser
-        select academic_data.ug_batches.adviser_f_id from academic_data.ug_batches where f_id = academic_data.ug_batches.adviser_f_id into adviser_f_id;
-        if adviser_f_id != '' then
-            -- store the tickets for a adviser in that particular semester
-            execute ('create table registrations.adviser_ticket_' || f_id || '_' || academic_year || ' ' ||
-                     semester_number ||
-                     ' (
-                         roll_number varchar not null,
-                         course_code varchar not null,
-                         status boolean,
-                         foreign key (course_code) references academic_data.course_catalog (course_code),
-                         foreign key (roll_number) references academic_data.student_info (roll_number),
-                        primary key (roll_number, course_code)
-                     )'
-                );
-            execute('grant all privileges on registrations.adviser_ticket_' || f_id || '_' || academic_year || ' ' ||semester_number ||' to '||f_id||';');
-            open student_cursor;
-            loop
-                fetch student_cursor into s_rollnumber;
-                exit when not found;
-                execute format('grant insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||' to '||s_rollnumber||';');
-            end loop;
-            close student_cursor;
-        end if;
     end loop;
     close faculty_cursor;
 
+    -- create adviser tables
+    open adviser_cursor;
+    loop
+        fetch adviser_cursor into adviser_f_id;
+        exit when not found;
+        -- store the tickets for a adviser in that particular semester
+        execute ('create table registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || ' ' ||
+                    semester_number ||
+                    ' (
+                        roll_number varchar not null,
+                        course_code varchar not null,
+                        status boolean,
+                        foreign key (course_code) references academic_data.course_catalog (course_code),
+                        foreign key (roll_number) references academic_data.student_info (roll_number),
+                    primary key (roll_number, course_code)
+                    )'
+            );
+        execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || ' ' ||semester_number ||' to '||adviser_f_id||';');
+        open student_cursor;
+        loop
+            fetch student_cursor into s_rollnumber;
+            exit when not found;
+            execute format('grant insert on registrations.adviser_ticket_'||adviser_f_id||'_'||academic_year||' to '||s_rollnumber||';');
+        end loop;
+        close student_cursor;
+    end loop;
+    close adviser_cursor;
+
+
 end;
 $function$ language plpgsql;
-
+------------------------------------------------------------------------------------------------------------------------------------------------
 create or replace function admin_data.create_student() returns trigger
 as
 $function$
@@ -292,26 +305,15 @@ begin
             );' ||
              'grant select on student_grades.student_' || new.roll_number || ' to ' || new.roll_number || ';'
         );
-    -- execute format('grant select on academic_data.course_catalog to %s;', new.roll_number);
-    -- execute format('grant select on academic_data.student_info to %s;', new.roll_number);
-    -- execute format('grant select on academic_data.faculty_info to %s;', new.roll_number);
-    -- execute format('grant select on academic_data.departments to %s;', new.roll_number);
---
---     grant select on academic_data.course_catalog to new.roll_number;
---     grant select on academic_data.student_info to new.roll_number;
---     grant select on academic_data.faculty_info to new.roll_number;
---     grant select on academic_data.departments to new.roll_number;
     return new;
 end;
 $function$ language plpgsql;
-
--- todo: to be added to the dean actions later so that only dean's office creates new students
-create trigger generate_student_record
+create or replace trigger generate_student_record
     after insert
     on academic_data.student_info
     for each row
 execute procedure admin_data.create_student();
-
+------------------------------------------------------------------------------------------------------------------------------------------------
 -- creating a faculty
 create or replace function admin_data.create_faculty() returns trigger
 as
@@ -320,26 +322,20 @@ declare
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, new.faculty_id);
-    -- execute format('grant select on academic_data.course_catalog to %s;', new.faculty_id);
-    -- execute format('grant select on academic_data.student_info to %s;', new.faculty_id);
-    -- execute format('grant select on academic_data.faculty_info to %s;', new.faculty_id);
-    -- execute format('grant select on academic_data.departments to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
+    execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
     execute format('grant select on tables in schema student_grades to %s;', new.faculty_id);
     return new;
---     grant select on academic_data.student_info to faculty_id;
---     grant select on academic_data.faculty_info to faculty_id;
---     grant select on academic_data.departments to faculty_id;
 end;
 $function$ language plpgsql ;
 
 -- todo: to be added to the dean actions later so that only dean's office creates new students
-create trigger generate_faculty_record
+create or replace trigger generate_faculty_record
     after insert
     on academic_data.faculty_info
     for each row
 execute function admin_data.create_faculty();
-
+------------------------------------------------------------------------------------------------------------------------------------------------
 -- creating a faculty
 create or replace function admin_data.create_adviser() returns trigger
 as
@@ -348,16 +344,9 @@ declare
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.adviser_f_id, new.adviser_f_id);
-    -- execute format('grant select on academic_data.course_catalog to %s;', new.adviser_f_id);
-    -- execute format('grant select on academic_data.student_info to %s;', new.adviser_f_id);
-    -- execute format('grant select on academic_data.faculty_info to %s;', new.adviser_f_id);
-    -- execute format('grant select on academic_data.departments to %s;', new.adviser_f_id);
     execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_f_id);
     execute format('grant select on tables in schema student_grades to %s;', new.adviser_f_id);
     return new;
---     grant select on academic_data.student_info to faculty_id;
---     grant select on academic_data.faculty_info to faculty_id;
---     grant select on academic_data.departments to faculty_id;
 end;
 $function$ language plpgsql ;
 
@@ -382,6 +371,7 @@ begin
 end;
 $$ language plpgsql;
 
+-- obtain credit limit
 create or replace function get_credit_limit(roll_number varchar)
     returns real as
 $$
@@ -498,7 +488,7 @@ begin
 end;
 $function$ language plpgsql;
 
--- to be implemented
+-- used by faculty to update student's tickets
 create or replace function faculty_actions.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) returns void as
 $function$
 declare
