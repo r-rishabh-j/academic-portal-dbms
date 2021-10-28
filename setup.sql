@@ -108,24 +108,25 @@ create table academic_data.faculty_info
 );
 -- todo: populate faculty info with dummy list of faculties from csv file
 
--- dept_year
-create table academic_data.ug_batches
-(
-    dept_name varchar,
-    batch_year integer,
-    adviser_f_id varchar,
-    PRIMARY KEY (dept_name, batch_year)
-);
--- TODO: populate with some random faculties acting as advisers from available faculties
-
 create table academic_data.adviser_info 
 (
     adviser_id varchar not null,
     batch_dept varchar,
     batch_year integer,
-    foreign key (adviser_f_id) references academic_data.faculty_info(faculty_id),
     primary key(adviser_f_id)
 );
+-- dept_year
+
+create table academic_data.ug_batches
+(
+    dept_name varchar,
+    batch_year integer,
+    adviser_f_id varchar,
+    foreign key(adviser_f_id) REFERENCES academic_data.adviser_info(adviser_id),
+    PRIMARY KEY (dept_name, batch_year)
+);
+-- TODO: populate with some random faculties acting as advisers from available faculties
+
 
 create table academic_data.timetable_slots
 (
@@ -153,7 +154,7 @@ begin
     loop
         if f_id=curr_user then continue;
         end if;
-        execute('grant select, update on registrations.'||new.course_code||'_'||year||'_'||semester||' to '||f_id||';');
+        execute('grant select, update on registrations.'||new.course_code||'_'||year||'_'||semester||' to '||f_id||' with grant option;');
     end loop;
     return new;
 end;
@@ -182,7 +183,8 @@ begin
                     slot            varchar,
                     allowed_batches varchar[] not null, -- will be combination of batch_year and department: cse_2021
                     cgpa_req        real default 0,
-                    foreign key (course_code) references academic_data.course_catalog (course_code)
+                    foreign key (course_code) references academic_data.course_catalog (course_code),
+                    primary key(course_code)
                 );'
         );
     execute('create trigger course_offerings.trigger_sem_'||academic_year||'_'||semester_number||
@@ -208,15 +210,6 @@ begin
              execute function check_register_for_course();'
         );
 
-    open student_cursor;
-    loop
-        fetch student_cursor into s_rollnumber;
-        exit when not found;
-        execute('grant select on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
-        execute('grant insert on course_offerings.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
-        execute('grant insert on registrations.student_ticket_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
-    end loop;
-    close student_cursor;
 
     execute('create table registrations.dean_tickets_'||academic_year||'_'||semester_number||' '||
        'roll_number varchar not null,
@@ -228,6 +221,15 @@ begin
         foreign key (roll_number) references academic_data.student_info (roll_number),
         primary key (roll_number, course_code)
     ');
+    open student_cursor;
+    loop
+        fetch student_cursor into s_rollnumber;
+        exit when not found;
+        execute('grant select on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
+        execute('grant insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
+        execute('grant select on registrations.dean_tickets_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
+    end loop;
+    close student_cursor;
 
     open faculty_cursor;
     loop
@@ -244,7 +246,9 @@ begin
                      primary key (roll_number, course_code)
                  )'
             );
-        execute('grant select on registrations.student_ticket_'||academic_year||'_'||semester_number||' to '||f_id||';');
+
+        -- todo: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
+
         execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' ||semester_number ||' to '||f_id||';');
         execute('grant insert on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||f_id||';');
         open student_cursor;
@@ -271,9 +275,10 @@ begin
                         status boolean,
                         foreign key (course_code) references academic_data.course_catalog (course_code),
                         foreign key (roll_number) references academic_data.student_info (roll_number),
-                    primary key (roll_number, course_code)
+                        primary key (roll_number, course_code)
                     )'
             );
+        -- todo: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
         execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || ' ' ||semester_number ||' to '||adviser_f_id||';');
         open student_cursor;
         loop
@@ -301,7 +306,8 @@ begin
                     semester        integer not null,
                     year            integer not null,
                     grade           integer not null default ''0'',
-                    foreign key (course_code) references academic_data.course_catalog (course_code)
+                    foreign key (course_code) references academic_data.course_catalog (course_code),
+                    primary key(course_code, semester, year)
             );' ||
              'grant select on student_grades.student_' || new.roll_number || ' to ' || new.roll_number || ';'
         );
@@ -324,12 +330,12 @@ begin
     execute format('create user %I password %L;', new.faculty_id, new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
+    execute format('grant create on schema registrations to %s;', new.faculty_id);
     execute format('grant select on tables in schema student_grades to %s;', new.faculty_id);
     return new;
 end;
 $function$ language plpgsql ;
 
--- todo: to be added to the dean actions later so that only dean's office creates new students
 create or replace trigger generate_faculty_record
     after insert
     on academic_data.faculty_info
@@ -420,6 +426,7 @@ begin
 end;
 $$ language plpgsql;
 
+------------------------------------------------------------------------------------------------------------------------------------------------
 -- assumed: registrations.coursecode_year_sem tables to be generated by trigger on course_offerings and access granted to the faculty
 create or replace function admin_data.populate_registrations() returns void as
 $function$
@@ -443,6 +450,7 @@ begin
 end;
 $function$ language plpgsql;
 
+------------------------------------------------------------------------------------------------------------------------------------------------
 -- run to get all tickets
 create or replace function admin_data.get_tickets() returns void as
 $function$
@@ -474,6 +482,29 @@ begin
 end;
 $function$ language plpgsql;
 
+-- used by admin to update tickets
+create or replace function admin_data.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) returns void as
+$function$
+declare
+f_id varchar;
+sem integer;
+yr integer;
+tbl_name varchar;
+begin
+    select current_user into f_id;
+    select semester, year from academic_data.semester into sem, yr;
+    tbl_name:=format('registrations.dean_tickets_%s_%s', yr, sem);
+    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
+    if new_status=true then
+        execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, stu_rollnumber);
+        raise notice 'Admin: Student % registered for course %.',stu_rollnumber,course;
+    else
+        raise notice 'Admin: Ticket of student % for course % rejected.',stu_rollnumber,course;
+    end if;
+end;
+$function$ language plpgsql;
+
+------------------------------------------------------------------------------------------------------------------------------------------------
 -- print faculty's tickets
 create or replace function faculty_actions.show_tickets() returns table(roll_number varchar, course_code varchar, status boolean) as
 $function$
@@ -504,25 +535,34 @@ begin
     raise notice 'Status for % for course % changed to %',stu_rollnumber,course,new_status;
 end;
 $function$ language plpgsql;
-
--- used by admin to update
-create or replace function admin_data.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) returns void as
+------------------------------------------------------------------------------------------------------------------------------------------------
+create or replace function adviser_actions.show_tickets() returns table(roll_number varchar, course_code varchar, status boolean) as
 $function$
 declare
-f_id varchar;
+adv_id varchar;
+sem integer;
+yr integer;
+begin
+    select current_user into adv_id;
+    select semester, year from academic_data.semester into sem, year;
+    return query execute format($dyn$select * from registrations.adviser_ticket_%s_%s_%s;$dyn$, adv_id, yr, sem);
+end;
+$function$ language plpgsql;
+
+-- used by adviser to update student's tickets
+create or replace function adviser_actions.update_ticket(stu_rollnumber varchar, course varchar, new_status boolean) returns void as
+$function$
+declare
+adv_id varchar;
 sem integer;
 yr integer;
 tbl_name varchar;
 begin
-    select current_user into f_id;
+    select current_user into adv_id;
     select semester, year from academic_data.semester into sem, yr;
-    tbl_name:=format('registrations.dean_tickets_%s_%s', yr, sem);
-    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
-    if new_status=true then
-        execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, stu_rollnumber);
-        raise notice 'Admin: Student % registered for course %.',stu_rollnumber,course;
-    else
-        raise notice 'Admin: Ticket of student % for course % rejected.',stu_rollnumber,course;
-    end if;
+    tbl_name:=format('registrations.adviser_ticket_%s_%s_%s', adv_id, yr, sem);
+    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name, new_status, course, stu_rollnumber);
+    raise notice 'Status for % for course % changed to %',stu_rollnumber,course,new_status;
 end;
 $function$ language plpgsql;
+------------------------------------------------------------------------------------------------------------------------------------------------
