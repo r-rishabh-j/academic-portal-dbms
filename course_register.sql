@@ -58,6 +58,8 @@ begin
     execute(format('select allowed_batches from course_offerings.sem_%s_%s where course_code=''%s'';',
         current_year, current_semester, course_code)) into allowed_batches;
 
+    if allowed_batches is null or allowed_batches='{}' then return true; end if;
+
     foreach batch in array allowed_batches
     loop
         if batch = student_batch

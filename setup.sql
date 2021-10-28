@@ -28,7 +28,7 @@ create schema student_grades; -- for final grades of the student for all the cou
 create schema course_offerings; -- for course offered in the particular semester and year
 create schema registrations;
 grant usage on schema registrations to public;
-grant select on all tables in schema registrations to public;
+-- grant select on all tables in schema registrations to public;
 grant usage on schema course_offerings to public;
 grant select on all tables in schema course_offerings to public;
 grant usage on schema academic_data to public;
@@ -49,7 +49,6 @@ create table academic_data.semester
     year integer not null,
     primary key (semester, year)
 );
-
 
 grant select on academic_data.semester to PUBLIC;
 
@@ -127,7 +126,6 @@ create table academic_data.ug_batches
 );
 -- TODO: populate with some random faculties acting as advisers from available faculties
 
-
 create table academic_data.timetable_slots
 (
     slot_name varchar primary key
@@ -175,6 +173,7 @@ declare
 begin
     -- assuming academic_year = 2021 and semester_number = 1
     -- will create table course_offerings.sem_2021_1 which will store the courses being offered that semester
+    update academic_data.semester set semester=semester_number, year=academic_year;
     execute ('create table course_offerings.sem_' || academic_year || '_' || semester_number || '
                 (
                     course_code     varchar primary key,
@@ -226,7 +225,7 @@ begin
         fetch student_cursor into s_rollnumber;
         exit when not found;
         execute('grant select on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
-        execute('grant insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
+        execute('grant select, insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
         execute('grant select on registrations.dean_tickets_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
     end loop;
     close student_cursor;
@@ -236,6 +235,7 @@ begin
         fetch faculty_cursor into f_id;
         exit when not found;
         -- store the tickets for a faculty in that particular semester
+        execute('grant select, insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||f_id||';');
         execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' || semester_number ||' '||
                  '(
                      roll_number varchar not null,
@@ -255,7 +255,7 @@ begin
         loop
             fetch student_cursor into s_rollnumber;
             exit when not found;
-            execute format('grant insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||' to '||s_rollnumber||';');
+            execute format('grant select, insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||' to '||s_rollnumber||';');
         end loop;
         close student_cursor;
     end loop;
@@ -284,13 +284,11 @@ begin
         loop
             fetch student_cursor into s_rollnumber;
             exit when not found;
-            execute format('grant insert on registrations.adviser_ticket_'||adviser_f_id||'_'||academic_year||' to '||s_rollnumber||';');
+            execute format('grant select, insert on registrations.adviser_ticket_'||adviser_f_id||'_'||academic_year||' to '||s_rollnumber||';');
         end loop;
         close student_cursor;
     end loop;
     close adviser_cursor;
-
-
 end;
 $function$ language plpgsql;
 ------------------------------------------------------------------------------------------------------------------------------------------------
@@ -357,9 +355,9 @@ end;
 $function$ language plpgsql ;
 
 -- todo: to be added to the dean actions later so that only dean's office creates new students
-create trigger generate_faculty_record
+create trigger generate_adviser_record
     after insert
-    on academic_data.faculty_info
+    on academic_data.adviser_info
     for each row
 execute function admin_data.create_adviser();
 
@@ -373,7 +371,7 @@ returns table (
 ) as
 $$
 begin
-    return query execute(format('select * from student_grades.student_%s', roll_number));
+    return query execute(format('select * from student_grades.student_%s;', roll_number));
 end;
 $$ language plpgsql;
 
