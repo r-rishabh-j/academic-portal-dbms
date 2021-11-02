@@ -21,3 +21,5 @@ begin
     execute format('copy academic_data.advisers from ''%s'' delimiter '','' csv header;', a_filename);
 end;
 $$ language plpgsql;
+
+call admin_data.load_students('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\students.csv');

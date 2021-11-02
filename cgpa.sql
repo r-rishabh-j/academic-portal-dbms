@@ -15,6 +15,7 @@ begin
             total_credits := total_credits + course_cred;
         end if;
     end loop;
+    if total_credits=0 then return 0; end if;
     cgpa := (scored) / total_credits;
     return cgpa;
 end;
@@ -39,6 +40,7 @@ begin
             total_credits := total_credits + course_cred;
         end if;
     end loop;
+    if total_credits=0 then return 0; end if;
     cgpa := (scored) / total_credits;
     return cgpa;
 end;
