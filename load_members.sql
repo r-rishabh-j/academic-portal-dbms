@@ -23,3 +23,4 @@ end;
 $$ language plpgsql;
 
 call admin_data.load_students('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\students.csv');
+call admin_data.load_faculty('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\faculty_info.csv');

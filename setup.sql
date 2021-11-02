@@ -46,6 +46,7 @@ create table academic_data.semester
 );
 
 grant select on academic_data.semester to PUBLIC;
+INSERT INTO academic_data.semester VALUES(0,0); -- default
 
 insert into academic_data.departments (dept_name)
 values ('cse'), -- computer science and engineering
@@ -179,18 +180,14 @@ begin
                     slot            varchar,
                     allowed_batches varchar[] not null, -- will be combination of batch_year and department: cse_2021
                     cgpa_req        real default 0,
-                    foreign key (course_code) references academic_data.course_catalog (course_code),
-                    primary key(course_code)
+                    foreign key (course_code) references academic_data.course_catalog (course_code)
             );'
         );
-    execute('create trigger course_offerings.trigger_sem_'||academic_year||'_'||semester_number||
-    'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute function
+    execute(format($s$grant select on course_offerings.sem_%s_%s to public;$s$, academic_year, semester_number));
+    execute('create trigger trigger_sem_'||academic_year||'_'||semester_number||
+    ' '||'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute function
     course_offerings.create_registration_table();');
-    -- will create table registrations.provisional_course_registrations_2021_1
-    -- to be deleted after registration window closes
-    -- to store the list of students interest in taking that course in that semester
-    -- whether to allow or not depends on various factors and
-    -- if accepted, then will be saved to registrations.{course_code}_2021_1
+
     execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || ' '||'
                 (   
                     roll_number     varchar not null,
@@ -206,22 +203,23 @@ begin
              execute function check_register_for_course();'
         );
 
+    execute(format($s$grant select on registrations.provisional_course_registrations_%s_%s to public;$s$, academic_year, semester_number));
 
     execute('create table registrations.dean_tickets_'||academic_year||'_'||semester_number||' '||
-       'roll_number varchar not null,
+       '(roll_number varchar not null,
         course_code varchar not null,
         dean_decision boolean,
         faculty_decision boolean,
         adviser_decision boolean,
         foreign key (course_code) references academic_data.course_catalog (course_code),
         foreign key (roll_number) references academic_data.student_info (roll_number),
-        primary key (roll_number, course_code)
+        primary key (roll_number, course_code));
     ');
     open student_cursor;
     loop
         fetch student_cursor into s_rollnumber;
         exit when not found;
-        execute('grant select on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
+        -- execute('grant select on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
         execute('grant select, insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
         execute('grant select on registrations.dean_tickets_'||academic_year||'_'||semester_number||' to '||s_rollnumber||';');
     end loop;
@@ -232,8 +230,9 @@ begin
         fetch faculty_cursor into f_id;
         exit when not found;
         -- store the tickets for a faculty in that particular semester
+        execute(format('grant select on all tables in schema student_grades to %s;', f_id));
         execute('grant select, insert on registrations.provisional_course_registrations_'||academic_year||'_'||semester_number||' to '||f_id||';');
-        execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' || semester_number ||' '||
+        execute ('create table registrations.faculty_ticket_' || f_id || '_' || academic_year || '_' || semester_number ||' '||
                  '(
                      roll_number varchar not null,
                      course_code varchar not null,
@@ -241,18 +240,18 @@ begin
                      foreign key (course_code) references academic_data.course_catalog (course_code),
                      foreign key (roll_number) references academic_data.student_info (roll_number),
                      primary key (roll_number, course_code)
-                 )'
+                 );'
             );
 
         -- TO DO: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
 
-        execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || ' ' ||semester_number ||' to '||f_id||';');
+        execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || '_' ||semester_number ||' to '||f_id||';');
         execute('grant insert on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||f_id||';');
         open student_cursor;
         loop
             fetch student_cursor into s_rollnumber;
             exit when not found;
-            execute format('grant select, insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||' to '||s_rollnumber||';');
+            execute format('grant select, insert on registrations.faculty_ticket_'||f_id||'_'||academic_year||'_' || semester_number ||' to '||s_rollnumber||';');
         end loop;
         close student_cursor;
     end loop;
@@ -264,7 +263,7 @@ begin
         fetch adviser_cursor into adviser_f_id;
         exit when not found;
         -- store the tickets for a adviser in that particular semester
-        execute ('create table registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || ' ' ||
+        execute ('create table registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' ||
                     semester_number ||
                     ' (
                         roll_number varchar not null,
@@ -273,15 +272,15 @@ begin
                         foreign key (course_code) references academic_data.course_catalog (course_code),
                         foreign key (roll_number) references academic_data.student_info (roll_number),
                         primary key (roll_number, course_code)
-                    )'
+                    );'
             );
         -- todo: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
-        execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || ' ' ||semester_number ||' to '||adviser_f_id||';');
+        execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' ||semester_number ||' to '||adviser_f_id||';');
         open student_cursor;
         loop
             fetch student_cursor into s_rollnumber;
             exit when not found;
-            execute format('grant select, insert on registrations.adviser_ticket_'||adviser_f_id||'_'||academic_year||' to '||s_rollnumber||';');
+            execute format('grant select, insert on registrations.adviser_ticket_'||adviser_f_id||'_'||academic_year||'_' || semester_number ||' to '||s_rollnumber||';');
         end loop;
         close student_cursor;
     end loop;
@@ -327,9 +326,11 @@ begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, pswd);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
+    execute format('grant execute on all procedures in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
+    execute format('grant execute on all procedures in schema course_offerings to %s;', new.faculty_id);
     execute format('grant create on schema registrations to %s;', new.faculty_id);
-    execute format('grant select on tables in schema student_grades to %s;', new.faculty_id);
+    execute format('grant select on all tables in schema student_grades to %s;', new.faculty_id);
     return new;
 end;
 $function$ language plpgsql ;
@@ -349,8 +350,9 @@ pswd varchar:='123';
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.adviser_f_id, pswd);
+    execute format('grant execute on all procedures in schema adviser_actions to %s;', new.adviser_f_id);
     execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_f_id);
-    execute format('grant select on tables in schema student_grades to %s;', new.adviser_f_id);
+    execute format('grant select on all tables in schema student_grades to %s;', new.adviser_f_id);
     return new;
 end;
 $function$ language plpgsql ;

@@ -152,6 +152,7 @@ declare
     allowed real := get_credit_limit(roll_number);
     taken real := 0;
     credit real;
+   registered record;
 begin
     select semester, year
     from academic_data.semester
