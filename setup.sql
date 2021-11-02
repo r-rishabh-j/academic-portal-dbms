@@ -58,9 +58,9 @@ values ('cse'), -- computer science and engineering
 ;
 
 -- undergraduate curriculum implemented only
-create table academic_data.degree
+create table academic_data.degree_info
 (
-    degree varchar primary key,
+    degree_type varchar primary key,
     program_electives_credits integer,
     open_electives_credits integer
 );
