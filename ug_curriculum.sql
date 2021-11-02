@@ -26,6 +26,8 @@ begin
 			);
 	end loop;
 
+	CLOSE ug_batches_cursor;
+
 	--grant select access to all!
 end
 $$language plpgsql;
