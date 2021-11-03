@@ -15,7 +15,6 @@ begin
         grade integer
     );
     $tbl$, temp_table_name));
-    -- execute('copy '|| temp_table_name ||' from '''|| grade_file ||''' delimiter '','' csv header;');
 
     execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$), temp_table_name, grade_file);
     execute (format($dyn$update %I set %I.grade=%I.grade from %I where %I.roll_number=%I.roll_number;$dyn$,

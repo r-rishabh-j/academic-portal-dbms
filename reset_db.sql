@@ -1,3 +1,9 @@
+-- copy student_info, adviser_info, faculty_info ids into another table
+
+-- clear all schemas from database
+
+-- drop all users from ids in step 1
+
 create or replace procedure drop_user(username text)
 as
 $$

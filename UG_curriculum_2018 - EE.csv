@@ -13,11 +13,11 @@ CS301,Databases,4,OE
 CS302,Design and Analysis of Algorithms,3,OE
 CS304,Computer Networks,4,OE
 CS305,Software Engineering,4,OE
-EE201,Systems & Signals,3,PE
+EE201,Systems & Signals,3,PC
 EE203,Digital Circuits,3,PC
-EE207,Control Engineering,3,PE
-EE304,Communication Engineering Lab,1.5,PC
-EE309,Power Systems,3,PC
+EE207,Control Engineering,3,PC
+EE304,Communication Engineering Lab,1.5,PE
+EE309,Power Systems,3,PE
 HS101,History of Tech,1.5,OE
 HS103,Professional English,3,OE
 HS104,Professional Ethics,1.5,OE
@@ -26,7 +26,7 @@ HS301,Industry Management,3,OE
 MA101,Calculus,3,SC
 MA202,Probability and Statistcs,3,SC
 ME101,Engineering Mechanics,3,OE
-ME101,Thermodynamics,3,OE
+ME103,Thermodynamics,3,OE
 ME205,Design Lab,2,OE
 ME204,Fluid Mechanics,3,OE
 ME301,Vibrations and Control,3,OE

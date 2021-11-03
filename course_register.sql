@@ -9,7 +9,7 @@ declare
     pre_requisites varchar[];
 begin
 
-    select academic_data.course_catalog.pre_requisities
+    select academic_data.course_catalog.pre_requisites
     from academic_data.course_catalog
     where academic_data.course_catalog.course_code = course_id
     into pre_requisites;
@@ -42,7 +42,7 @@ $$
 declare
     current_semester integer;
     current_year integer;
-    student_batch integer;
+    student_batch varchar;
     allowed_batches varchar[];
     batch varchar;
 begin
@@ -132,8 +132,10 @@ begin
             total_credits := total_credits + course_cred;
         end if;
     end loop;
+   
+   	IF total_credits=0 THEN RETURN TRUE;END IF;
+   
     cgpa := (scored) / total_credits;
-
     if cgpa >= required
         then return true;
     else
@@ -206,8 +208,7 @@ begin
 end;
 $trigfunc$;
 
-create or replace function register_for_course(course_id varchar)
-    returns void
+create or replace procedure register_for_course(course_id text)
     language plpgsql
 as
 $func$
@@ -219,7 +220,7 @@ begin
     select semester, year from academic_data.semester into current_semester, current_year;
     select current_user into roll_number;
     execute ('insert into registrations.provisional_course_registrations_' || current_year || '_' || current_semester ||
-             '(roll_number, course_code) values (' || roll_number || ', ' || course_id || ');');
+             '(roll_number, course_code) values (''' || roll_number || ''', ''' || course_id || ''');');
     -- will trigger the check above
 end
 $func$

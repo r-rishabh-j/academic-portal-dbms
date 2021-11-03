@@ -329,9 +329,9 @@ $function$
 declare
 pswd varchar:='123';
 begin
---     create user faculty_id password faculty_id;
+    --  create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, pswd);
-   execute format('grant usage on schema faculty_actions to %s;', new.faculty_id);
+    execute format('grant usage on schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all procedures in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
@@ -357,7 +357,7 @@ pswd varchar:='123';
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.adviser_id, pswd);
-   execute format('grant usage on schema adviser_actions to %s;', new.adviser_id);
+    execute format('grant usage on schema adviser_actions to %s;', new.adviser_id);
     execute format('grant execute on all procedures in schema adviser_actions to %s;', new.adviser_id);
     execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_id);
     execute format('grant select on all tables in schema student_grades to %s;', new.adviser_id);
@@ -393,7 +393,7 @@ $$
 declare
     current_semester    integer;
     current_year        integer;
-    course_code         varchar;
+    course_id         varchar;
     courses_to_consider varchar[];
     credits_taken       real;
 begin
@@ -421,10 +421,10 @@ begin
                                                                    and grades_list.year = current_year - 1));
     end if;
     credits_taken = 0;
-    foreach course_code in array courses_to_consider
+    foreach course_id in array courses_to_consider
         loop
-            credits_taken = credits_taken + (select academic_data.course_catalog.credits
-                                             where academic_data.course_catalog.course_code = course_code);
+            credits_taken = credits_taken + (select academic_data.course_catalog.credits FROM academic_data.course_catalog
+                                             where academic_data.course_catalog.course_code = course_id);
         end loop;
     if credits_taken = 0
     then
@@ -744,3 +744,78 @@ begin
     raise notice 'Course % offered by faculty %.', course_name, curr_user;
 end;
 $proc$ language plpgsql;
+
+create or replace procedure faculty_actions.upload_grades(grade_file text, course_name text) as
+$function$
+declare
+    semester        integer;
+    year            integer;
+    temp_table_name varchar;
+    reg_table_name  varchar;
+begin
+    select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
+    temp_table_name := 'temporary_grade_store_' || course_name || '_' || year || '_' || semester;
+    reg_table_name := 'registrations.' || course_name || '_' || year || '_' || semester;
+    execute (format($tbl$create table %I
+    (
+        roll_number varchar,
+        grade integer
+    );
+    $tbl$, temp_table_name));
+    -- execute('copy '|| temp_table_name ||' from '''|| grade_file ||''' delimiter '','' csv header;');
+
+    execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$), temp_table_name, grade_file);
+    execute (format($dyn$update %I set %I.grade=%I.grade from %I where %I.roll_number=%I.roll_number;$dyn$,
+                    reg_table_name, reg_table_name, temp_table_name, temp_table_name, reg_table_name, temp_table_name));
+
+    execute format('drop table %I;', temp_table_name);
+end;
+$function$ language plpgsql;
+---------------------------------------------------------------------------------------------------------------------------
+create or replace procedure faculty_actions.update_grade(roll_number text, course text, grade integer)
+as
+$f$
+begin
+
+end;
+$f$ language plpgsql;
+
+create or replace procedure admin_data.release_grades()
+as
+$f$
+declare
+    sem integer;
+    yr integer;
+    course_offering record;
+    student record;
+begin
+    select semester, year from academic_data.semester into sem, yr;
+    for course_offering in execute(format($d$select course_code from course_offerings.sem_%s_%s;$d$,yr,sem))
+    loop
+        for student in execute(format($d$select * from registrations.%s_%s_%s;$d$,course_offering.course_code, yr, sem))
+        loop
+            execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
+            raise notice 'Student % given % grade in course %.', student.roll_number, student.grade, course_offering.course_code;
+        end loop;
+    end loop;
+end;
+$f$ language plpgsql;
+----------------------------------------------------------------------------------------------------------------------------
+create or replace procedure admin_data.release_grades(sem integer, yr integer)
+as
+$f$
+declare
+    course_offering record;
+    student record;
+begin
+    for course_offering in execute(format($d$select course_code from course_offerings.sem_%s_%s;$d$,yr,sem))
+    loop
+        for student in execute(format($d$select * from registrations.%s_%s_%s;$d$,course_offering.course_code, yr, sem))
+        loop
+            execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
+            raise notice 'Student % given % grade in course %.', student.roll_number, student.grade, course_offering.course_code;
+        end loop;
+    end loop;
+end;
+$f$ language plpgsql;
+---------------------------------------------------------------------------------------------------------------------------------------

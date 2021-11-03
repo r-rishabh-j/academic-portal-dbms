@@ -1,0 +1,37 @@
+Course_Code,Department,Credits,Credit Structure,Course_Description,Prerequisites
+ge101,ge,1,x-x-x,Technology Museum,{}
+ge102,ge,2,x-x-x,Workshop Practice,{}
+ge103,ge,3,x-x-x,Introduction to Computing,{}
+ge104,ge,3,x-x-x,Introduction to Electrical Engineering,{}
+ge105,ge,1.5,x-x-x,Engineering Drawing,{}
+ge201,ge,3,x-x-x,Material Science,{}
+cs101,cse,3,x-x-x,Discrete Mathematics,{}
+cs201,cse,4,x-x-x,Data Structures,"{ge103, cs101}"
+cs203,cse,4,x-x-x,Digital Logic Design,{ge103}
+cs204,cse,4,x-x-x,Computer Architecture,{cs203}
+cs301,cse,4,x-x-x,Databases,{cs201}
+cs302,cse,3,x-x-x,Design and Analysis of Algorithms,"{cs101, cs201}"
+cs304,cse,4,x-x-x,Computer Networks,{cs201}
+cs305,cse,4,x-x-x,Software Engineering,{cs201}
+ee201,ee,3,x-x-x,Systems & Signals,{}
+ee203,ee,3,x-x-x,Digital Circuits,{ge104}
+ee207,ee,3,x-x-x,Control Engineering,{ge104}
+ee304,ee,1.5,x-x-x,Communication Engineering Lab,{ge104}
+ee309,ee,3,x-x-x,Power Systems,"{ge104, ee207}"
+hs101,hs,1.5,x-x-x,History of Tech,{}
+hs103,hs,3,x-x-x,Professional English,{}
+hs104,hs,1.5,x-x-x,Professional Ethics,{}
+hs201,hs,3,x-x-x,Economics,{}
+hs301,hs,3,x-x-x,Industry Management,{hs104}
+ma101,sc,3,x-x-x,Calculus,{}
+ma202,sc,3,x-x-x,Probability and Statistcs,{}
+me101,me,3,x-x-x,Engineering Mechanics,{}
+me103,me,3,x-x-x,Thermodynamics,{}
+me205,me,2,x-x-x,Design Lab,{me101}
+me204,me,3,x-x-x,Fluid Mechanics,{me101}
+me301,me,3,x-x-x,Vibrations and Control,{me101}
+me303,me,1,x-x-x,Thermo Fluids Lab,{}
+me308,me,2,x-x-x,Manufacturing Lab,{}
+bm101,sc,3,x-x-x,Biology,{}
+cy101,sc,4,x-x-x,Chemistry,{}
+ph101,sc,4.5,x-x-x,Physucs,{}
