@@ -14,7 +14,7 @@ begin
     where academic_data.course_catalog.course_code = course_id
     into pre_requisites;
 
-    if pre_requisites = '{}'
+    if pre_requisites = '{}' or pre_requisites is null
         then return true; -- no requirement
     end if;
 
@@ -29,7 +29,7 @@ begin
         end loop;
         if present = false
             then 
-            raise notice 'Prerequisite % not found';
+            raise notice 'Prerequisite % not found', requirement;
            return false;
         end if;
     end loop;
@@ -171,7 +171,7 @@ begin
     select semester, year
     from academic_data.semester
     into current_semester, current_year;
-
+	allowed := get_credit_limit(roll_number);
     execute(format('select credits from academic_data.course_catalog where course_code=''%s'';',
             course_code)) into credit;
     taken := taken + credit;
@@ -183,7 +183,8 @@ begin
             registered.course_code)) into credit;
         taken := taken + credit;
     end loop;
-
+	
+   raise notice 'allowed: %, taken: %',allowed, taken;
     if allowed >= taken
         then 
         raise notice 'Credit limit satisfied.';
@@ -202,8 +203,11 @@ as
 $trigfunc$
 declare
     flag boolean := true;
+   	curr_user varchar;
 begin
     -- ensure prerequisites
+	SELECT current_user INTO curr_user;
+	IF curr_user!=NEW.roll_number THEN raise notice 'Permission denied. Invalid roll_number'; RETURN NULL; END IF;
     flag := flag and check_prerequisites(new.roll_number, new.course_code);
     -- ensure allowed batch
     flag := flag and check_allowed_batches(new.roll_number, new.course_code);

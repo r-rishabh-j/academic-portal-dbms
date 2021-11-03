@@ -423,6 +423,8 @@ begin
     credits_taken = 0;
     foreach course_id in array courses_to_consider
         loop
+        	if course_id is null then continue;end if;
+        	raise notice 'course: %',course_id;
             credits_taken = credits_taken + (select academic_data.course_catalog.credits FROM academic_data.course_catalog
                                              where academic_data.course_catalog.course_code = course_id);
         end loop;
@@ -452,7 +454,7 @@ begin
     select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
     prov_reg_name := 'registrations.provisional_course_registrations_' || year || '_' || semester||' ';
 
-    for row in execute format('select * from %I;', prov_reg_name)
+    for row in execute format('select * from %s;', prov_reg_name)
     loop
     execute('insert into registrations.'||row.course_code||'_'||year||'_'||semester||' '||'values('''||row.roll_number||''', 0);'); -- roll_number, grade
     end loop;
@@ -775,8 +777,13 @@ $function$ language plpgsql;
 create or replace procedure faculty_actions.update_grade(roll_number text, course text, grade integer)
 as
 $f$
+DECLARE
+    sem INTEGER;
+    yr INTEGER;
 begin
-
+    select semester, year from academic_data.semester into sem, yr;
+    EXECUTE(format($d$update registrations.%s_%s_%s set grade=%s where roll_number='%s';$d$, course, yr, sem, grade, roll_number));
+    raise notice 'Grade for student % for course % updated to %', roll_number, course, grade;
 end;
 $f$ language plpgsql;
 
@@ -794,7 +801,8 @@ begin
     loop
         for student in execute(format($d$select * from registrations.%s_%s_%s;$d$,course_offering.course_code, yr, sem))
         loop
-            execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
+            execute(format($d$insert into student_grades.student_%s values('%s', %s, %s, %s);$d$,student.roll_number, course_offering.course_code, sem, yr, student.grade ));
+            -- execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
             raise notice 'Student % given % grade in course %.', student.roll_number, student.grade, course_offering.course_code;
         end loop;
     end loop;
