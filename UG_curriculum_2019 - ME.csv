@@ -1,37 +1,37 @@
 Course_code,Course_Description,Credits,Type
-GE101,Technology Museum,1,OE
-GE102,Workshop Practice,2,OE
-GE103,Introduction to Computing,3,OE
-GE104,Introduction to Electrical Engineering,3,OE
-GE105,Engineering Drawing,1.5,OE
-GE201,Material Science,3,OE
-CS101,Discrete Mathematics,3,OE
-CS201,Data Structures,4,OE
-CS203,Digital Logic Design,4,OE
-CS204,Computer Architecture,4,OE
-CS301,Databases,4,OE
-CS302,Design and Analysis of Algorithms,3,OE
-CS304,Computer Networks,4,OE
-CS305,Software Engineering,4,OE
-EE201,Systems & Signals,3,OE
-EE203,Digital Circuits,3,OE
-EE207,Control Engineering,3,OE
-EE304,Communication Engineering Lab,1.5,OE
-EE309,Power Systems,3,OE
-HS101,History of Tech,1.5,OE
-HS103,Professional English,3,OE
-HS104,Professional Ethics,1.5,OE
-HS201,Economics,3,OE
-HS301,Industry Management,3,OE
-MA101,Calculus,3,SC
-MA202,Probability and Statistcs,3,SC
-ME101,Engineering Mechanics,3,PC
-ME103,Thermodynamics,3,PC
-ME205,Design Lab,2,PC
-ME204,Fluid Mechanics,3,PC
-ME301,Vibrations and Control,3,PE
-ME303,Thermo Fluids Lab,1,PE
-ME308,Manufacturing Lab,2,PE
-BM101,Biology,3,SC
-CY101,Chemistry,4,SC
-PH101,Physucs,4.5,SC
+ge101,Technology Museum,1,OE
+ge102,Workshop Practice,2,OE
+ge103,Introduction to Computing,3,OE
+ge104,Introduction to Electrical Engineering,3,OE
+ge105,Engineering Drawing,1.5,OE
+ge201,Material Science,3,OE
+cs101,Discrete Mathematics,3,OE
+cs201,Data Structures,4,OE
+cs203,Digital Logic Design,4,OE
+cs204,Computer Architecture,4,OE
+cs301,Databases,4,OE
+cs302,Design and Analysis of Algorithms,3,OE
+cs304,Computer Networks,4,OE
+cs305,Software Engineering,4,OE
+ee201,Systems & Signals,3,OE
+ee203,Digital Circuits,3,OE
+ee207,Control Engineering,3,OE
+ee304,Communication Engineering Lab,1.5,OE
+ee309,Power Systems,3,OE
+hs101,History of Tech,1.5,OE
+hs103,Professional English,3,OE
+hs104,Professional Ethics,1.5,OE
+hs201,Economics,3,OE
+hs301,Industry Management,3,OE
+ma101,Calculus,3,SC
+ma202,Probability and Statistcs,3,SC
+me101,Engineering Mechanics,3,PC
+me103,Thermodynamics,3,PC
+me205,Design Lab,2,PC
+me204,Fluid Mechanics,3,PC
+me301,Vibrations and Control,3,PE
+me303,Thermo Fluids Lab,1,PE
+me308,Manufacturing Lab,2,PE
+bm101,Biology,3,SC
+cy101,Chemistry,4,SC
+ph101,Physucs,4.5,SC
