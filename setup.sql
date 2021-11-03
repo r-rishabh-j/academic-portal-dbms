@@ -827,3 +827,10 @@ begin
 end;
 $f$ language plpgsql;
 ---------------------------------------------------------------------------------------------------------------------------------------
+create or replace procedure faculty_actions.dump_grades(course_code text)
+as
+$d$
+begin
+    
+end;
+$d$
