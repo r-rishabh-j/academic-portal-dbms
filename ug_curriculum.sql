@@ -61,7 +61,7 @@ begin
 	if student_cgpa < 5 then return false; end if;
 
 	--2.check all core(program and science) courses done
-	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || student_roll_number || '" into' || student_batch || ',' || student_dept || ';');
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || student_roll_number || '" ;' ) INTO student_batch, student_dept;
 
 	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || 'where type = ''PC'' or ''SC'';')
 	loop
@@ -82,7 +82,7 @@ begin
 	for course in execute('select * from student_grades.student_'|| student_roll_number || ';')
 	loop
 		--check syntax!
-		execute('select type, credits from ug_curriculum.' || student_dept || '_' || student_batch || ' where course_code = ''' || course.course_code || ''' into ' || course_type || ', ' || course_cred || ';');
+		execute('select type, credits from ug_curriculum.' || student_dept || '_' || student_batch || ' where course_code = ''' || course.course_code || ''';' )INTO course_type, course_cred;
 		if course.grade != 0 and course_type = "PE" then
 			pe_credits_done :=  pe_credits_done + course_cred;
 		end if;
