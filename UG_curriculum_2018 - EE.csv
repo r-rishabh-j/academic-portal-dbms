@@ -1,0 +1,37 @@
+Course_code,Course_Description,Credits,Type
+GE101,Technology Museum,1,OE
+GE102,Workshop Practice,2,OE
+GE103,Introduction to Computing,3,OE
+GE104,Introduction to Electrical Engineering,3,OE
+GE105,Engineering Drawing,1.5,OE
+GE201,Material Science,3,OE
+CS101,Discrete Mathematics,3,OE
+CS201,Data Structures,4,OE
+CS203,Digital Logic Design,4,OE
+CS204,Computer Architecture,4,OE
+CS301,Databases,4,OE
+CS302,Design and Analysis of Algorithms,3,OE
+CS304,Computer Networks,4,OE
+CS305,Software Engineering,4,OE
+EE201,Systems & Signals,3,PE
+EE203,Digital Circuits,3,PC
+EE207,Control Engineering,3,PE
+EE304,Communication Engineering Lab,1.5,PC
+EE309,Power Systems,3,PC
+HS101,History of Tech,1.5,OE
+HS103,Professional English,3,OE
+HS104,Professional Ethics,1.5,OE
+HS201,Economics,3,OE
+HS301,Industry Management,3,OE
+MA101,Calculus,3,SC
+MA202,Probability and Statistcs,3,SC
+ME101,Engineering Mechanics,3,OE
+ME101,Thermodynamics,3,OE
+ME205,Design Lab,2,OE
+ME204,Fluid Mechanics,3,OE
+ME301,Vibrations and Control,3,OE
+ME303,Thermo Fluids Lab,1,OE
+ME308,Manufacturing Lab,2,OE
+BM101,Biology,3,SC
+CY101,Chemistry,4,SC
+PH101,Physucs,4.5,SC

@@ -11,7 +11,7 @@ import random
 def id_generator(size=6, chars=string.ascii_uppercase + string.digits):
     return ''.join(random.choice(chars) for _ in range(size))
 
-def generate_student_data(num_students_per_branch=10, branches = ["cse", "ee", "me"], batches = ['2020', '2019', '2018', '2017']):
+def generate_student_data(num_students_per_branch=10, branches = ["cse", "ee", "me"], batches = ['2019', '2018']):
     def generate_batch(num_students_per_branch, years):
         # per branch equal students
         batch = [[],[],[],[]]
@@ -34,7 +34,22 @@ def generate_student_data(num_students_per_branch=10, branches = ["cse", "ee", "
     student_data['batch_year'] = students[3]
     student_data.to_csv('students.csv', index=False)
 
-def generate_teacher_data():
-    pass
+branches = ["cse", "ee", "me"]
+batches = ['2019', '2018']
+def generate_adviser_data(branches, batches):
+    adviser_data = pd.DataFrame(columns=['adviser_id', 'batch_dept', 'batch_year'])
+    adv_ids = []
+    adv_dept = []
+    adv_year = []
+    for year in batches:
+        for branch in branches:
+            adv_ids.append('adv_'+branch+'_'+year)
+            adv_dept.append(branch)
+            adv_year.append(year)
+    adviser_data['adviser_id']=adv_ids 
+    adviser_data['batch_dept']=adv_dept
+    adviser_data['batch_year']=adv_year
+    adviser_data.to_csv('adviser.csv', index=False)
 
-generate_student_data()
+generate_student_data(branches=branches,  batches=batches)
+generate_adviser_data(branches=branches,  batches=batches)
