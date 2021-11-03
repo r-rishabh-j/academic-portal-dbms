@@ -206,18 +206,23 @@ declare
    	curr_user varchar;
    	student_batch integer;
    	student_dept varchar;
-   	
+   	check_course record;
 begin
     -- ensure prerequisites
 	SELECT current_user INTO curr_user;
 	IF curr_user!=NEW.roll_number THEN raise notice 'Permission denied. Invalid roll_number'; RETURN NULL; END IF;
 
-	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || student_roll_number || ''' ;' ) INTO student_batch, student_dept;
-
-	IF NEW.course_code NOT IN execute('select course_code from ug_curriculum.' || student_dept || '_' || student_batch || ';') THEN 
-		raise notice 'Course not in UG Curriculum'
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || curr_user || ''' ;' ) INTO student_batch, student_dept;
+	
+	execute(format($d$select course_code from ug_curriculum.%s_%s where course_code='%s';$d$, student_dept, student_batch, new.course_code)) into check_course;
+	if check_course is null then
+	raise notice 'Course not in UG Curriculum';
 		RETURN NULL; 
 	END IF;
+--	IF NEW.course_code NOT IN execute('select course_code from ug_curriculum.' || student_dept || '_' || student_batch || ';') THEN 
+--		raise notice 'Course not in UG Curriculum'
+--		RETURN NULL; 
+--	END IF;
 
     flag := flag and check_prerequisites(new.roll_number, new.course_code);
     -- ensure allowed batch
@@ -254,8 +259,8 @@ begin
     execute ('insert into registrations.provisional_course_registrations_' || current_year || '_' || current_semester ||
              '(roll_number, course_code) values (''' || roll_number || ''', ''' || course_id || ''');');
     -- will trigger the check above
-end
-$func$
+end;
+$func$;
 
 
 CREATE OR replace PROCEDURE raise_ticket(course_id text)
@@ -275,18 +280,14 @@ BEGIN
 	select semester, year from academic_data.semester into current_semester, current_year;
 
 	--insert in course coordinator and adviser ticket table
-	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || ' where course_code = "' || course_id || '";') INTO coord_id;
+	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || ' where course_code = ''' || course_id || ''';') INTO coord_id;
 	EXECUTE('insert into registrations.faculty_ticket_' || coord_id || '_' || current_year || '_' || current_semester ||
-             ' values (''' || roll_number || ''', ''' || course_id || ''', NULL);');
+             ' values (''' || curr_user || ''', ''' || course_id || ''', NULL);');
             
     --insert in adviser_table
-    execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || curr_user || '";') INTO student_batch, student_dept;
-	execute('select adviser_f_id from academic_data.ug_batches where dept_name = "' || student_dept || '" and batch_year = "' || student_batch || '";') INTO adv_id;
+    execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || curr_user || ''';') INTO student_batch, student_dept;
+	execute('select adviser_f_id from academic_data.ug_batches where dept_name = ''' || student_dept || ''' and batch_year = ''' || student_batch || ''';') INTO adv_id;
 	EXECUTE('insert into registrations.adviser_ticket_' || adv_id || '_' || current_year || '_' || current_semester ||
-             ' values (''' || roll_number || ''', ''' || course_id || ''', NULL);');
-	
-	
-	
-END
-end
-$$
+             ' values (''' || curr_user || ''', ''' || course_id || ''', NULL);');
+END;
+$$;

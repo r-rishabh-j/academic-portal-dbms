@@ -493,7 +493,7 @@ begin
             select adviser_f_id from academic_data.ug_batches where dept_name=st_dept and batch_year=st_year into adv_id;
             execute format('select status from registrations.adviser_ticket_'||adv_id||'_'||yr||'_'||sem||' where roll_number=''%s'' and course_code=''%s'';',
                 row.roll_number,row.course_code) into advisor_permission;
-            execute format($d$insert into registrations.dean_tickets_%s_%s values('%s','%s',%s,%s,%s);$d$,yr, sem, row.roll_number, row.course_code, null, faculty_permission, advisor_permission);
+            execute format($d$insert into registrations.dean_tickets_%s_%s values('%s','%s',null,%L,%L);$d$,yr, sem, row.roll_number, row.course_code, faculty_permission, advisor_permission);
         end loop;
     end loop;
 end;
@@ -511,9 +511,9 @@ begin
     select current_user into f_id;
     select semester, year from academic_data.semester into sem, yr;
     tbl_name:=format('registrations.dean_tickets_%s_%s', yr, sem);
-    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
+    execute format($dyn$update %s set dean_decision=%L where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
     if new_status=true then
-        execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, stu_rollnumber);
+        execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, course, yr, sem, stu_rollnumber);
         raise notice 'Admin: Student % registered for course %.',stu_rollnumber, course;
     else
         raise notice 'Admin: Ticket of student % for course % rejected.',stu_rollnumber, course;
@@ -547,7 +547,7 @@ begin
     select current_user into f_id;
     select semester, year from academic_data.semester into sem, yr;
     tbl_name:=format('registrations.faculty_ticket_%s_%s_%s', f_id, yr, sem);
-    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
+    execute format($dyn$update %s set status=%L where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
     raise notice 'Status for % for course % changed to %',stu_rollnumber,course,new_status;
 end;
 $function$ language plpgsql;
@@ -772,7 +772,7 @@ begin
     $tbl$, temp_table_name));
     -- execute('copy '|| temp_table_name ||' from '''|| grade_file ||''' delimiter '','' csv header;');
 
-    execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$), temp_table_name, grade_file);
+    execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$, temp_table_name, grade_file));
     execute (format($dyn$update %I set %I.grade=%I.grade from %I where %I.roll_number=%I.roll_number;$dyn$,
                     reg_table_name, reg_table_name, temp_table_name, temp_table_name, reg_table_name, temp_table_name));
 
@@ -801,15 +801,20 @@ declare
     yr integer;
     course_offering record;
     student record;
+   	grade_record record;
 begin
     select semester, year from academic_data.semester into sem, yr;
     for course_offering in execute(format($d$select course_code from course_offerings.sem_%s_%s;$d$,yr,sem))
     loop
         for student in execute(format($d$select * from registrations.%s_%s_%s;$d$,course_offering.course_code, yr, sem))
         loop
-            execute(format($d$insert into student_grades.student_%s values('%s', %s, %s, %s);$d$,student.roll_number, course_offering.course_code, sem, yr, student.grade ));
-            -- execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
-            raise notice 'Student % given % grade in course %.', student.roll_number, student.grade, course_offering.course_code;
+        	execute(format($d$select * from student_grades.student_%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, course_offering.course_code, sem, yr)) into grade_record;
+        	if grade_record is null then
+            	execute(format($d$insert into student_grades.student_%s values('%s', %s, %s, %s);$d$,student.roll_number, course_offering.course_code, sem, yr, student.grade ));
+            else
+ 				execute(format($d$update student_grades.student_%s set grade=%s where course_code='%s' and semester=%s and year=%s;$d$, student.roll_number, student.grade, course_offering.course_code, sem, yr));
+            end if;
+ 			raise notice 'Student % given % grade in course %.', student.roll_number, student.grade, course_offering.course_code;
         end loop;
     end loop;
 end;
