@@ -38,6 +38,7 @@ branches = ["cse", "ee", "me"]
 batches = ['2019', '2018']
 def generate_adviser_data(branches, batches):
     adviser_data = pd.DataFrame(columns=['adviser_id', 'batch_dept', 'batch_year'])
+    ugbatch_data = pd.DataFrame(columns=['batch_dept', 'batch_year','adviser_id'])
     adv_ids = []
     adv_dept = []
     adv_year = []
@@ -50,6 +51,10 @@ def generate_adviser_data(branches, batches):
     adviser_data['batch_dept']=adv_dept
     adviser_data['batch_year']=adv_year
     adviser_data.to_csv('adviser.csv', index=False)
+    ugbatch_data['batch_dept']=adv_dept
+    ugbatch_data['batch_year']=adv_year
+    ugbatch_data['adviser_id']=adv_ids 
+    ugbatch_data.to_csv('up_batches.csv', index=False)
 
 generate_student_data(branches=branches,  batches=batches)
 generate_adviser_data(branches=branches,  batches=batches)
