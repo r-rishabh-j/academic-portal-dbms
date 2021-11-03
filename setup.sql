@@ -833,10 +833,15 @@ begin
 end;
 $f$ language plpgsql;
 ---------------------------------------------------------------------------------------------------------------------------------------
-create or replace procedure faculty_actions.dump_grades(course_code text)
+create or replace procedure faculty_actions.dump_grades(course_code text, dump_path text)
 as
 $d$
+declare
+sem integer; 
+yr integer;
 begin
-    
+    select semester, year from academic_data.semester into sem, yr;
+    execute(format($s$copy registrations.%s_%s_%s to '%s' with (format csv, header);$s$, course_code, yr, sem, dump_path));
+    raise notice 'Registration file for course % dumped at %', course_code, dump_path;
 end;
-$d$
+$d$language plpgsql;
