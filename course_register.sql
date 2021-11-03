@@ -204,10 +204,21 @@ $trigfunc$
 declare
     flag boolean := true;
    	curr_user varchar;
+   	student_batch integer;
+   	student_dept varchar;
+   	
 begin
     -- ensure prerequisites
 	SELECT current_user INTO curr_user;
 	IF curr_user!=NEW.roll_number THEN raise notice 'Permission denied. Invalid roll_number'; RETURN NULL; END IF;
+
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || student_roll_number || ''' ;' ) INTO student_batch, student_dept;
+
+	IF NEW.course_code NOT IN execute('select course_code from ug_curriculum.' || student_dept || '_' || student_batch || ';') THEN 
+		raise notice 'Course not in UG Curriculum'
+		RETURN NULL; 
+	END IF;
+
     flag := flag and check_prerequisites(new.roll_number, new.course_code);
     -- ensure allowed batch
     flag := flag and check_allowed_batches(new.roll_number, new.course_code);
