@@ -1,9 +1,12 @@
-drop schema if exists ug_curriculum;
+--drop schema if exists ug_curriculum cascade;
+--
+--create schema ug_curriculum;
+--
+--grant usage on schema ug_curriculum to public;
+--grant select on all tables in schema ug_curriculum to public;
 
-create schema ug_curriculum;
-
-create or replace function ug_curriculum.create_batch_tables()
-returns void as
+create or replace procedure ug_curriculum.create_batch_tables()
+as
 $$
 declare
 	ug_batches_cursor cursor for select * from academic_data.ug_batches;
@@ -16,17 +19,17 @@ begin
 	loop
 		fetch ug_batches_cursor into rec_batch;
 		exit when not found;
-		execute('create table ug_curriculum.' || rec_batch.dept_name || '_' || rec_batch.batch_year || 
-				' (
+		execute('create table ug_curriculum.' || rec_batch.dept_name || '_' || rec_batch.batch_year || ' '||
+				'(
 					course_code				varchar not null,
-					course_description		varchar default '',
+					course_description		varchar default '''',
 					credits					real not null,
 					type					varchar not null,
 					primary key(course_code)
 				);'	
 			);
 	end loop;
-
+grant select on all tables in schema ug_curriculum to public;
 	CLOSE ug_batches_cursor;
 
 	--grant select access to all!
@@ -61,9 +64,9 @@ begin
 	if student_cgpa < 5 then return false; end if;
 
 	--2.check all core(program and science) courses done
-	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || student_roll_number || '" ;' ) INTO student_batch, student_dept;
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || student_roll_number || ''' ;' ) INTO student_batch, student_dept;
 
-	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || 'where type = ''PC'' or ''SC'';')
+	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || ' where type = ''PC'' or type =''SC'';')
 	loop
 		present := false;
 		for course in execute('select * from student_grades.student_'|| student_roll_number || ';')
@@ -97,6 +100,15 @@ begin
 	return true;
 end;
 $$;
+
+create or replace procedure ug_curriculum.upload_curriculum(filep text, dept varchar, year integer)
+as 
+$f$
+begin 
+	execute(format($d$copy ug_curriculum.%s_%s from '%s' delimiter ',' csv header;$d$, dept, year, filep));
+end;
+$f$language plpgsql;
+
 
 
 

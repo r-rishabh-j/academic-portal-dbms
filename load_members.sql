@@ -25,3 +25,13 @@ $$ language plpgsql;
 call admin_data.load_students('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\students.csv');
 call admin_data.load_faculty('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\faculty_info.csv');
 call admin_data.load_advisers('C:\MyData\IIT-Study\3rd Year\Assignments\CS301\Project\academic-portal-dbms\adviser.csv');
+
+create or replace procedure admin_data.upload_batches(filep text)
+as 
+$f$
+begin 
+	execute format('copy academic_data.ug_batches from ''%s'' delimiter '','' csv header;', filep);
+end;
+$f$language plpgsql;
+
+call admin_data.upload_batches('C:\Users\risha\Desktop\Assignments\CS301\Project\academic-portal-dbms\ug_batches.csv');

@@ -17,6 +17,8 @@ drop schema if exists
     registrations,
     adviser_actions
     cascade;
+   
+drop schema if exists ug_curriculum cascade;
 
 /*
  create the required schemas which will have tables and some custom dummy data
@@ -28,6 +30,8 @@ create schema adviser_actions;
 create schema student_grades; -- for final grades of the student for all the courses taken to generate C.G.P.A.
 create schema course_offerings; -- for course offered in the particular semester and year
 create schema registrations;
+create schema ug_curriculum;
+
 
 -- will contain information regarding student registration and tickets
 
@@ -135,6 +139,8 @@ grant select, references on all tables in schema course_offerings to public;
 grant usage on schema academic_data to public;
 grant select, references on all tables in schema academic_data to public;
 grant usage on schema student_grades to public;
+grant usage on schema ug_curriculum to public;
+grant select on all tables in schema ug_curriculum to public;
 
 create or replace function course_offerings.create_registration_table()
 returns trigger as
