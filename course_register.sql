@@ -256,3 +256,37 @@ begin
     -- will trigger the check above
 end
 $func$
+
+
+CREATE OR replace PROCEDURE raise_ticket(course_id text)
+LANGUAGE plpgsql
+AS
+$$
+DECLARE
+	curr_user varchar;
+	current_semester 	integer;
+    current_year     	integer;
+   	coord_id			varchar;
+   	student_batch 		 integer;
+	student_dept 		 varchar;
+	adv_id 				 varchar;
+BEGIN
+	SELECT current_user INTO curr_user;
+	select semester, year from academic_data.semester into current_semester, current_year;
+
+	--insert in course coordinator and adviser ticket table
+	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || ' where course_code = "' || course_id || '";') INTO coord_id;
+	EXECUTE('insert into registrations.faculty_ticket_' || coord_id || '_' || current_year || '_' || current_semester ||
+             ' values (''' || roll_number || ''', ''' || course_id || ''', NULL);');
+            
+    --insert in adviser_table
+    execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || curr_user || '";') INTO student_batch, student_dept;
+	execute('select adviser_f_id from academic_data.ug_batches where dept_name = "' || student_dept || '" and batch_year = "' || student_batch || '";') INTO adv_id;
+	EXECUTE('insert into registrations.adviser_ticket_' || adv_id || '_' || current_year || '_' || current_semester ||
+             ' values (''' || roll_number || ''', ''' || course_id || ''', NULL);');
+	
+	
+	
+END
+end
+$$
