@@ -8,10 +8,10 @@ language plpgsql
 as 
 $$
 declare
-	course record;
+	course 				record;
 	current_roll_number varchar;
-	current_semester integer;
-    current_year     integer;
+	current_semester 	integer;
+    current_year     	integer;
 begin 
 	--if insert roll number is not the same as the current user roll number
 	select current_user into current_roll_number;
@@ -33,6 +33,7 @@ begin
 end
 $$;
 
+
 --write trigger-function binding statements
 create or replace function registrations.withdraw_course_request(course_id varchar)
 returns void
@@ -40,9 +41,9 @@ language plpgsql
 as
 $$
 declare
-	current_semester integer;
-    current_year     integer;
-    student_roll_number      varchar;
+	current_semester 	integer;
+    current_year		integer;
+    student_roll_number	varchar;
 begin 
 	select semester, year from academic_data.semester into current_semester, current_year;
     select current_user into student_roll_number;
@@ -52,7 +53,26 @@ begin
 end
 $$;
 
+CREATE OR replace procedure admin_data.cancel_course_registration()
+LANGUAGE plpgsql
+AS
+$$
+DECLARE
+	current_year		integer;
+	current_semester	integer;
+	reg					record;
+BEGIN
+	select semester, year from academic_data.semester into current_semester, current_year;
 
+	--1. delete entry from provisional course regisration(existance ensured by trigger)
+	FOR reg IN execute('select * from registrations.provisional_course_registrations_' || current_year || '_' || current_semester ||';')
+	loop
+		
+	END loop;
+	
+	--2. delete student entry from final course registration, if exists
+END
+$$;
 
 --write trigger-function binding statements
 create or replace function registrations.check_drop_request()
@@ -109,6 +129,7 @@ begin
 end
 $$;
 
+
 --write trigger-function binding statements
 create or replace function registrations.drop_ticket_request(course_id varchar)
 returns void
@@ -127,3 +148,4 @@ begin
     --trigger will check if such an entry exists in the faculty(find course_coordinator) and adviser(find from ug_batches) ticket tables
 end
 $$;
+

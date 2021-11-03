@@ -3,7 +3,7 @@ create or replace function check_prerequisites(roll_number varchar, course_id va
 returns boolean as
 $$
 declare
-    found boolean;
+    present boolean;
     requirement varchar;
     course record;
     pre_requisites varchar[];
@@ -20,17 +20,20 @@ begin
 
     foreach requirement in array pre_requisites
     loop
-        found := false;
+        present := false;
         for course in execute ('select * from student_grades.student_' || roll_number || ';')
         loop
             if course.grade != 0 and course.course_code = requirement
-                then found = true;  -- requirement completed
+                then present = true;  -- requirement completed
             end if;
         end loop;
-        if found = false
-            then return false;
+        if present = false
+            then 
+            raise notice 'Prerequisite % not found';
+           return false;
         end if;
     end loop;
+   	raise notice 'Prerequisites found';
     return true;
 end;
 $$ language plpgsql;
@@ -63,10 +66,13 @@ begin
     foreach batch in array allowed_batches
     loop
         if batch = student_batch
-            then return true;
+            then 
+            raise notice 'Batch allowed';
+           return true;
         end if;
     end loop;
 
+   	raise notice 'Batch not allowed';
     return false;
 end;
 $$ language plpgsql;
@@ -95,10 +101,13 @@ begin
         execute(format('select slot from course_offerings.sem_%s_%s where course_code=''%s'';',
             current_year, current_semester, registered.course_code)) into slot_used;
         if slot_used = slot_required
-            then return false;
+            then 
+            raise notice 'Slot not free';
+           return false;
         end if;
     end loop;
-
+	
+   	raise notice 'Slot free';
     return true;
 end;
 $$ language plpgsql;
@@ -137,8 +146,11 @@ begin
    
     cgpa := (scored) / total_credits;
     if cgpa >= required
-        then return true;
-    else
+        then 
+        raise notice 'CGPA req passed';
+       return true;
+    ELSE
+    	raise notice 'CGPA req failed';
         return false;
     end if;
 
@@ -173,8 +185,11 @@ begin
     end loop;
 
     if allowed >= taken
-        then return true;
-    else
+        then 
+        raise notice 'Credit limit satisfied.';
+       return true;
+    ELSE
+    	raise notice 'Credit limit failed.';
         return false;
     end if;
 end;
@@ -199,10 +214,12 @@ begin
     -- ensure within credit limit
     flag := flag and check_credit_limit(new.roll_number, new.course_code);
 
-    if flag = true
-        then return new;
+    if flag = TRUE then 
+    	raise notice 'All checks cleared, provisionally registered.';
+       return new;
     else
         -- todo: tell reason for failure
+ 		raise notice 'Registration failed.';
         return null;
     end if;
 end;
