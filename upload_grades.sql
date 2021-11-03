@@ -25,6 +25,14 @@ begin
 end;
 $function$ language plpgsql;
 
+create or replace procedure faculty_actions.update_grade(roll_number text, course text, grade integer)
+as
+$f$
+begin
+
+end;
+$f$ language plpgsql;
+
 create or replace procedure admin_data.release_grades()
 as
 $f$

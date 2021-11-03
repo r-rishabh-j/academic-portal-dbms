@@ -22,4 +22,4 @@ begin
 
     drop table admin_data.temp_timetable_slots;
 end;
-$f$
+$f$language plpgsql;

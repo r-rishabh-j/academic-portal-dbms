@@ -120,15 +120,23 @@ create table academic_data.timetable_slots
     slot_name varchar primary key
 );
 
+insert into academic_data.timetable_slots values(1);
+insert into academic_data.timetable_slots values(2);
+insert into academic_data.timetable_slots values(3);
+insert into academic_data.timetable_slots values(4);
+insert into academic_data.timetable_slots values(5);
+insert into academic_data.timetable_slots values(6);
+insert into academic_data.timetable_slots values(7);
+
 grant usage on schema registrations to public;
 -- grant select on all tables in schema registrations to public;
 grant usage on schema course_offerings to public;
-grant select on all tables in schema course_offerings to public;
+grant select, references on all tables in schema course_offerings to public;
 grant usage on schema academic_data to public;
-grant select on all tables in schema academic_data to public;
+grant select, references on all tables in schema academic_data to public;
 grant usage on schema student_grades to public;
 
-create function course_offerings.create_registration_table()
+create or replace function course_offerings.create_registration_table()
 returns trigger as
 $$
 declare
@@ -142,7 +150,7 @@ begin
     '(
         roll_number varchar not null,
         grade integer default 0,
-        foreign key(roll_number) references academic_data.student_info
+        foreign key(roll_number) references academic_data.student_info(roll_number)
     );');
     select current_user into curr_user;
     foreach f_id in array new.instructors
@@ -323,6 +331,7 @@ pswd varchar:='123';
 begin
 --     create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, pswd);
+   execute format('grant usage on schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all procedures in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
@@ -347,10 +356,11 @@ declare
 pswd varchar:='123';
 begin
 --     create user faculty_id password faculty_id;
-    execute format('create user %I password %L;', new.adviser_f_id, pswd);
-    execute format('grant execute on all procedures in schema adviser_actions to %s;', new.adviser_f_id);
-    execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_f_id);
-    execute format('grant select on all tables in schema student_grades to %s;', new.adviser_f_id);
+    execute format('create user %I password %L;', new.adviser_id, pswd);
+   execute format('grant usage on schema adviser_actions to %s;', new.adviser_id);
+    execute format('grant execute on all procedures in schema adviser_actions to %s;', new.adviser_id);
+    execute format('grant execute on all functions in schema adviser_actions to %s;', new.adviser_id);
+    execute format('grant select on all tables in schema student_grades to %s;', new.adviser_id);
     return new;
 end;
 $function$ language plpgsql ;
@@ -611,16 +621,18 @@ end;
 $fn$ language plpgsql;
 ------------------------------------------------------------------------------------------------------------------------------------------------
 -- check if the faculty is offering that course or not
-create or replace function check_instructor_match(f_id varchar)
+create or replace function check_instructor_match()
     returns trigger as
 $$
 declare
     student_id varchar;
     coordinator_id varchar;
+    f_id varchar;
     sem integer;
     yr integer;
 begin
     new.status:=null; -- protection
+    f_id = tg_argv[0];
     select current_user into student_id;
     if student_id!=new.roll_number then raise notice 'Invalid roll_number'; return null; end if;
     select semester, year from academic_data.semester into sem, yr;
@@ -635,16 +647,18 @@ end;
 $$ language plpgsql;
 
 -- check if that faculty is the adviser or not
-create or replace function check_adviser_match(advid varchar)
+create or replace function check_adviser_match()
     returns trigger as
 $$
 declare
     student_id varchar;
     adv_id varchar;
+    advid varchar; -- for argv
     sem integer;
     yr integer;
 begin
     new.status:=null; -- protection
+    advid:=tg_argv[0];
     select current_user into student_id;
     if student_id!=new.roll_number then raise notice 'Not your roll_number.'; return null; end if;
     select semester, year from academic_data.semester into sem, yr;
@@ -682,4 +696,51 @@ begin
 end;
 $f$language plpgsql;
 
+create or replace procedure admin_data.upload_timetable(file text)
+as
+$f$
+declare
+    sem         integer;
+    yr          integer;
+    course_slot record;
+begin
+    select semester, year from academic_data.semester into sem, yr;
+    create table admin_data.temp_timetable_slots
+    (
+        course_code varchar,
+        slot        varchar
+    );
+    execute (format($d$copy admin_data.temp_timetable_slots from '%s' delimiter ',' csv header;$d$), file);
 
+    for course_slot in select * from admin_data.temp_timetable_slots
+        loop
+            execute (format($d$update course_offerings.sem_%s_%s set slot='%s' where course_code='%s';$d$, yr, sem,
+                            course_slot.slot, course_slot.course_code));
+        end loop;
+
+    drop table admin_data.temp_timetable_slots;
+end;
+$f$language plpgsql;
+
+create or replace procedure faculty_actions.offer_course(course_name text, instructor_list text[],
+                                                         allowed_batches text[], cgpa_lim real)
+as
+$proc$
+declare
+    course_row record := null;
+    sem        integer;
+    yr         integer;
+    curr_user  varchar;
+begin
+    select semester, year from academic_data.semester into sem, yr;
+    select current_user into curr_user;
+    select * from academic_data.course_catalog where course_code = course_name into course_row;
+    if course_row is null then
+        raise notice 'Course % does not exist in catalog.',course_name;
+        return;
+    end if;
+    execute (format($d$insert into course_offerings.sem_%s_%s values('%s','%s','%s',null,'%s',%s)$d$, course_name,
+                    curr_user, instructor_list, allowed_batches, cgpa_lim));
+    raise notice 'Course % offered by faculty %.', course_name, curr_user;
+end;
+$proc$ language plpgsql;
