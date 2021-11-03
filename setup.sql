@@ -338,6 +338,7 @@ begin
     --  create user faculty_id password faculty_id;
     execute format('create user %I password %L;', new.faculty_id, pswd);
     execute format('grant usage on schema faculty_actions to %s;', new.faculty_id);
+    execute format('grant pg_read_server_files to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all procedures in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
@@ -764,7 +765,7 @@ begin
     select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
     temp_table_name := 'temporary_grade_store_' || course_name || '_' || year || '_' || semester;
     reg_table_name := 'registrations.' || course_name || '_' || year || '_' || semester;
-    execute (format($tbl$create table %I
+    execute (format($tbl$create table %s
     (
         roll_number varchar,
         grade integer
@@ -772,11 +773,10 @@ begin
     $tbl$, temp_table_name));
     -- execute('copy '|| temp_table_name ||' from '''|| grade_file ||''' delimiter '','' csv header;');
 
-    execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$, temp_table_name, grade_file));
-    execute (format($dyn$update %I set %I.grade=%I.grade from %I where %I.roll_number=%I.roll_number;$dyn$,
-                    reg_table_name, reg_table_name, temp_table_name, temp_table_name, reg_table_name, temp_table_name));
+    execute (format($dyn$copy %s from '%s' delimiter ',' csv header;$dyn$, temp_table_name, grade_file));
+    execute (format($dyn$update %s set grade=%s.grade from %s where %s.roll_number=%s.roll_number;$dyn$, reg_table_name, temp_table_name, temp_table_name, reg_table_name, temp_table_name));
 
-    execute format('drop table %I;', temp_table_name);
+    execute format('drop table %s;', temp_table_name);
 end;
 $function$ language plpgsql;
 ---------------------------------------------------------------------------------------------------------------------------

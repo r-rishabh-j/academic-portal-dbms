@@ -16,11 +16,11 @@ begin
     );
     $tbl$, temp_table_name));
 
-    execute (format($dyn$copy %I from '%s' delimiter ',' csv header;$dyn$), temp_table_name, grade_file);
-    execute (format($dyn$update %I set %I.grade=%I.grade from %I where %I.roll_number=%I.roll_number;$dyn$,
+    execute (format($dyn$copy %s from '%s' delimiter ',' csv header;$dyn$), temp_table_name, grade_file);
+    execute (format($dyn$update %s set %s.grade=%s.grade from %s where %s.roll_number=%s.roll_number;$dyn$,
                     reg_table_name, reg_table_name, temp_table_name, temp_table_name, reg_table_name, temp_table_name));
 
-    execute format('drop table %I;', temp_table_name);
+    execute format('drop table %s;', temp_table_name);
 end;
 $function$ language plpgsql;
 
