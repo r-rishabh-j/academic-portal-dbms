@@ -64,7 +64,7 @@ create table academic_data.degree_info
     program_electives_credits integer,
     open_electives_credits integer
 );
-insert into academic_data.degree
+insert into academic_data.degree_info
 values ('btech', 6, 18); -- bachelors degree only
 
 create table academic_data.course_catalog
@@ -243,6 +243,8 @@ begin
                  );'
             );
 
+        execute(format($d$create trigger faculty_ticket_trigger_%s_%s_%s before insert on registrations.faculty_ticket_%s_%s_%s for each row
+            execute function check_instructor_match('%s')$d$, f_id, academic_year, semester_number, f_id, academic_year, semester_number, f_id));
         -- TO DO: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
 
         execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || '_' ||semester_number ||' to '||f_id||';');
@@ -275,6 +277,8 @@ begin
                     );'
             );
         -- todo: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
+        execute(format($d$create trigger adviser_ticket_trigger_%s_%s_%s before insert on registrations.adviser_ticket_%s_%s_%s for each row
+            execute function check_adviser_match('%s')$d$, adviser_f_id, academic_year, semester_number, adviser_f_id, academic_year, semester_number, adviser_f_id));
         execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' ||semester_number ||' to '||adviser_f_id||';');
         open student_cursor;
         loop
@@ -498,9 +502,9 @@ begin
     execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name,new_status,course,stu_rollnumber);
     if new_status=true then
         execute format($i$insert into registrations.%s_%s_%s values('%s',0);$i$, stu_rollnumber);
-        raise notice 'Admin: Student % registered for course %.',stu_rollnumber,course;
+        raise notice 'Admin: Student % registered for course %.',stu_rollnumber, course;
     else
-        raise notice 'Admin: Ticket of student % for course % rejected.',stu_rollnumber,course;
+        raise notice 'Admin: Ticket of student % for course % rejected.',stu_rollnumber, course;
     end if;
 end;
 $function$ language plpgsql;
@@ -612,3 +616,51 @@ begin
 end;
 $fn$ language plpgsql;
 ------------------------------------------------------------------------------------------------------------------------------------------------
+-- check if the faculty is offering that course or not
+create or replace function check_instructor_match(f_id varchar)
+    returns trigger as
+$$
+declare
+    student_id varchar;
+    coordinator_id varchar;
+    sem integer;
+    yr integer;
+begin
+    new.status=null; -- protection
+    select current_user into student_id;
+    if student_id!=new.roll_number then raise notice 'Invalid roll_number'; return null; end if;
+    select semester, year from academic_data.semester into sem, yr;
+    execute format($e$select course_coordinator from course_offerings.sem_%s_%s where course_code='%s';$e$,yr,sem,new.course_code) into coordinator_id;
+    if coordinator_id is null then raise notice 'Invalid course id'; return null; end if;
+    if f_id!=coordinator_id then
+        raise notice 'Faculty % is not the course coordinator for course %. Kindly send the ticket to the right instructor.',f_id,new.course_id;
+        return null;
+    end if;
+    return new;
+end;
+$$ language plpgsql;
+
+-- check if that faculty is the adviser or not
+create or replace function check_adviser_match(advid varchar)
+    returns trigger as
+$$
+declare
+    student_id varchar;
+    adv_id varchar;
+    sem integer;
+    yr integer;
+begin
+    new.status=null; -- protection
+    select current_user into student_id;
+    if student_id!=new.roll_number then raise notice 'Not your roll_number.'; return null; end if;
+    select semester, year from academic_data.semester into sem, yr;
+
+    select adviser_id from academic_data.adviser_info, academic_data.student_info where academic_data.adviser_info.batch_year=academic_data.student_info.batch_year
+    and academic_data.adviser_info.batch_dept=academic_data.student_info.department into adv_id;
+
+    if advid!=adv_id then raise notice 'Ticket sent to wrong adviser'; return null; end if;
+
+    return new;
+end;
+$$ language plpgsql;
+

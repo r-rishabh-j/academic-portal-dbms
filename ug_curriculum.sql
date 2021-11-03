@@ -29,8 +29,8 @@ begin
 	CLOSE ug_batches_cursor;
 
 	--grant select access to all!
-end
-$$language plpgsql;
+end;
+$$ language plpgsql;
 
 --write load from csv, admin_data function
 
@@ -62,7 +62,7 @@ begin
 	--2.check all core(program and science) courses done
 	select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = student_roll_number into student_batch, student_dept;
 
-	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || 'where type = 'PC' or 'SC';')
+	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || 'where type = ''PC'' or ''SC'';')
 	loop
 		present := false;
 		for course in execute('select * from student_grades.student_'|| student_roll_number || ';')
@@ -81,7 +81,7 @@ begin
 	for course in execute('select * from student_grades.student_'|| student_roll_number || ';')
 	loop
 		--check syntax!
-		execute('select type, credits from ug_curriculum.' || student_dept || '_' || student_batch || ' where course_code = ' || course.course_code || ' into ' || course_type || ', ' || course_cred || ';');
+		execute('select type, credits from ug_curriculum.' || student_dept || '_' || student_batch || ' where course_code = ''' || course.course_code || ''' into ' || course_type || ', ' || course_cred || ';');
 		if course.grade != 0 and course_type = 'PE' then
 			pe_credits_done :=  pe_credits_done + course_cred;
 		end if;
@@ -93,10 +93,8 @@ begin
 	if pe_credits_done < pe_credits_req or oe_credits_done < oe_credits_req then 
 		return false;
 	end if;
-	
 	return true;
-
-end
+end;
 $$;
 
 
