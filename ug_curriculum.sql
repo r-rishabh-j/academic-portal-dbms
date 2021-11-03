@@ -17,11 +17,12 @@ begin
 		fetch ug_batches_cursor into rec_batch;
 		exit when not found;
 		execute('create table ug_curriculum.' || rec_batch.dept_name || '_' || rec_batch.batch_year || 
-				'(
+				' (
 					course_code				varchar not null,
 					course_description		varchar default '',
 					credits					real not null,
 					type					varchar not null,
+					primary key(course_code)
 				);'	
 			);
 	end loop;
@@ -60,7 +61,7 @@ begin
 	if student_cgpa < 5 then return false; end if;
 
 	--2.check all core(program and science) courses done
-	select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = student_roll_number into student_batch, student_dept;
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || student_roll_number || '" into' || student_batch || ',' || student_dept || ';');
 
 	for req in execute('select * from ug_curriculum.' || student_dept || '_' || student_batch || 'where type = ''PC'' or ''SC'';')
 	loop
@@ -76,16 +77,16 @@ begin
 	
 	--3.check elective (program and open) credits against acads limit
 	--replace table name as "academic_data.degree_info" and field name as "degree_type"
-	select program_electives_credits, open_electives_credits from academic_data.degree_info where degree_type = 'btech' into pe_credits_req, oe_credits_req;
+	select program_electives_credits, open_electives_credits from academic_data.degree_info where degree_type = "btech" into pe_credits_req, oe_credits_req;
 	
 	for course in execute('select * from student_grades.student_'|| student_roll_number || ';')
 	loop
 		--check syntax!
 		execute('select type, credits from ug_curriculum.' || student_dept || '_' || student_batch || ' where course_code = ''' || course.course_code || ''' into ' || course_type || ', ' || course_cred || ';');
-		if course.grade != 0 and course_type = 'PE' then
+		if course.grade != 0 and course_type = "PE" then
 			pe_credits_done :=  pe_credits_done + course_cred;
 		end if;
-		if course.grade != 0 and course_type = 'OE' then
+		if course.grade != 0 and course_type = "OE" then
 			oe_credits_done :=  oe_credits_done + course_cred;
 		end if;
 	end loop;
