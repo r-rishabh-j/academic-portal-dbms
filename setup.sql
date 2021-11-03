@@ -114,7 +114,6 @@ create table academic_data.ug_batches
     foreign key(adviser_f_id) REFERENCES academic_data.adviser_info(adviser_id),
     PRIMARY KEY (dept_name, batch_year)
 );
--- TODO: populate with some random faculties acting as advisers from available faculties
 
 create table academic_data.timetable_slots
 (
@@ -184,9 +183,8 @@ begin
             );'
         );
     execute(format($s$grant select on course_offerings.sem_%s_%s to public;$s$, academic_year, semester_number));
-    execute('create trigger trigger_sem_'||academic_year||'_'||semester_number||
-    ' '||'after insert on course_offerings.sem_' || academic_year || '_' || semester_number ||' for each row execute function
-    course_offerings.create_registration_table();');
+    execute('create trigger trigger_sem_'||academic_year||'_'||semester_number||' '||'after insert on course_offerings.sem_' || academic_year || '_' || semester_number
+                ||' for each row execute function course_offerings.create_registration_table();');
 
     execute ('create table registrations.provisional_course_registrations_' || academic_year || '_' || semester_number || ' '||'
                 (   
@@ -242,13 +240,11 @@ begin
                      primary key (roll_number, course_code)
                  );'
             );
-
         execute(format($d$create trigger faculty_ticket_trigger_%s_%s_%s before insert on registrations.faculty_ticket_%s_%s_%s for each row
             execute function check_instructor_match('%s')$d$, f_id, academic_year, semester_number, f_id, academic_year, semester_number, f_id));
-        -- TO DO: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
-
         execute('grant all privileges on registrations.faculty_ticket_' || f_id || '_' || academic_year || '_' ||semester_number ||' to '||f_id||';');
         execute('grant insert on course_offerings.sem_'||academic_year||'_'||semester_number||' to '||f_id||';');
+
         open student_cursor;
         loop
             fetch student_cursor into s_rollnumber;
@@ -265,8 +261,7 @@ begin
         fetch adviser_cursor into adviser_f_id;
         exit when not found;
         -- store the tickets for a adviser in that particular semester
-        execute ('create table registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' ||
-                    semester_number ||
+        execute ('create table registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' || semester_number ||
                     ' (
                         roll_number varchar not null,
                         course_code varchar not null,
@@ -276,7 +271,6 @@ begin
                         primary key (roll_number, course_code)
                     );'
             );
-        -- todo: create tigger!!!!!!!!!!!!!!!!!!!!!!!!!
         execute(format($d$create trigger adviser_ticket_trigger_%s_%s_%s before insert on registrations.adviser_ticket_%s_%s_%s for each row
             execute function check_adviser_match('%s')$d$, adviser_f_id, academic_year, semester_number, adviser_f_id, academic_year, semester_number, adviser_f_id));
         execute('grant all privileges on registrations.adviser_ticket_' || adviser_f_id || '_' || academic_year || '_' ||semester_number ||' to '||adviser_f_id||';');
@@ -318,7 +312,7 @@ create trigger generate_student_record
     after insert
     on academic_data.student_info
     for each row
-execute procedure admin_data.create_student();
+execute function admin_data.create_student();
 ------------------------------------------------------------------------------------------------------------------------------------------------
 -- creating a faculty
 create or replace function admin_data.create_faculty() returns trigger
@@ -626,7 +620,7 @@ declare
     sem integer;
     yr integer;
 begin
-    new.status=null; -- protection
+    new.status:=null; -- protection
     select current_user into student_id;
     if student_id!=new.roll_number then raise notice 'Invalid roll_number'; return null; end if;
     select semester, year from academic_data.semester into sem, yr;
@@ -650,7 +644,7 @@ declare
     sem integer;
     yr integer;
 begin
-    new.status=null; -- protection
+    new.status:=null; -- protection
     select current_user into student_id;
     if student_id!=new.roll_number then raise notice 'Not your roll_number.'; return null; end if;
     select semester, year from academic_data.semester into sem, yr;
@@ -663,4 +657,29 @@ begin
     return new;
 end;
 $$ language plpgsql;
+
+-- to be used by student, no argument needed
+create or replace function generate_student_transcript() returns
+table(course_code varchar, semester integer, year integer, grade integer)
+as
+$f$
+declare
+    student_id varchar;
+begin
+    select current_user into student_id;
+    raise notice 'Transcript for student %', student_id;
+    return query execute(format($d$select * from student_grades.student_%s;$d$, student_id));
+end;
+$f$language plpgsql;
+
+create or replace function generate_student_transcript(student_id varchar) returns
+table(course_code varchar, semester integer, year integer, grade integer)
+as
+$f$
+begin
+    raise notice 'Transcript for student %', student_id;
+    return query execute(format($d$select * from student_grades.student_%s;$d$, student_id));
+end;
+$f$language plpgsql;
+
 
