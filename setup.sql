@@ -132,6 +132,7 @@ insert into academic_data.timetable_slots values(5);
 insert into academic_data.timetable_slots values(6);
 insert into academic_data.timetable_slots values(7);
 
+
 grant usage on schema registrations to public;
 grant usage on schema course_offerings to public;
 grant select, references on all tables in schema course_offerings to public;
@@ -149,7 +150,9 @@ semester integer;
 year integer;
 f_id varchar;
 curr_user varchar;
-begin
+BEGIN
+	select current_user into curr_user;
+	IF curr_user!=NEW.course_coordinator THEN raise notice 'Invalid faculty id';RETURN NULL; END IF;
     select academic_data.semester.semester, academic_data.semester.year from academic_data.semester into semester, year;
     execute('create table registrations.'||new.course_code||'_'||year||'_'||semester||' '||
     '(
@@ -157,7 +160,7 @@ begin
         grade integer default 0,
         foreign key(roll_number) references academic_data.student_info(roll_number)
     );');
-    select current_user into curr_user;
+    
     foreach f_id in array new.instructors
     loop
         if f_id=curr_user then continue;
@@ -205,6 +208,9 @@ begin
                     foreign key (course_code) references academic_data.course_catalog (course_code)
             );'
         );
+    
+--    execute(format($f$create TABLE $f$));
+       
     execute(format($s$grant select on course_offerings.sem_%s_%s to public;$s$, academic_year, semester_number));
     execute('create trigger trigger_sem_'||academic_year||'_'||semester_number||' '||'after insert on course_offerings.sem_' || academic_year || '_' || semester_number
                 ||' for each row execute function course_offerings.create_registration_table();');
@@ -385,7 +391,9 @@ begin
     execute format('drop user if exists %I;', new.faculty_id);
     execute format('create user %I password %L;', new.faculty_id, pswd);
     execute format('grant usage on schema faculty_actions to %s;', new.faculty_id);
+   
     execute format('grant pg_read_server_files to %s;', new.faculty_id);
+   	execute format('grant pg_write_server_files to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all procedures in schema faculty_actions to %s;', new.faculty_id);
     execute format('grant execute on all functions in schema course_offerings to %s;', new.faculty_id);
@@ -451,6 +459,8 @@ declare
     course_id         varchar;
     courses_to_consider varchar[];
     credits_taken       real;
+    b1 boolean:=FALSE;
+   b2 boolean:=FALSE;
 begin
     select semester, year from academic_data.semester into current_semester, current_year;
     if current_semester = 2
@@ -460,6 +470,7 @@ begin
                                                                  where grades_list.semester = 1
                                                                    and grades_list.year = current_year
         loop 
+        	b1:=TRUE;
         	courses_to_consider=array_append(courses_to_consider, course_id); 
         end loop;
        
@@ -467,6 +478,7 @@ begin
                                                                  where grades_list.semester = 2
                                                                    and grades_list.year = current_year-1
         loop 
+        	b2:=TRUE;
         	courses_to_consider=array_append(courses_to_consider, course_id); 
         end loop;
 --        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
@@ -483,6 +495,7 @@ begin
                                                                  where grades_list.semester = 1
                                                                    and grades_list.year = current_year-1
         loop 
+        	b1:=TRUE;
         	courses_to_consider=array_append(courses_to_consider, course_id); 
         end loop;
        
@@ -490,6 +503,7 @@ begin
                                                                  where grades_list.semester = 2
                                                                    and grades_list.year = current_year-1
         loop 
+        	b2:=TRUE;
         	courses_to_consider=array_append(courses_to_consider, course_id); 
         end loop;
 --        courses_to_consider = array_append(courses_to_consider, (select grades_list.course_code
@@ -502,6 +516,7 @@ begin
 --                                                                   and grades_list.year = current_year - 1));
     end if;
     credits_taken = 0;
+    if courses_to_consider is not null then
     foreach course_id in array courses_to_consider
         loop
         	if course_id is null then continue;end if;
@@ -509,11 +524,16 @@ begin
             credits_taken = credits_taken + (select academic_data.course_catalog.credits FROM academic_data.course_catalog
                                              where academic_data.course_catalog.course_code = course_id);
         end loop;
+    end if;
     if credits_taken = 0
     then
         return 20;  -- default credit limit
-    else
-        return (credits_taken * 1.25) / 2; -- calculated credit limit
+    ELSE
+    	IF b1=TRUE AND b2=TRUE then
+        return (credits_taken * 1.25) / 2; -- calculated credit LIMIT
+        ELSE
+        return (credits_taken * 1.25);
+       END IF;
     end if;
 end;
 $$ language plpgsql;
@@ -577,9 +597,24 @@ begin
     end loop;
 end;
 $function$ language plpgsql;
+
+create or replace function admin_data.show_tickets() returns table(roll_number varchar,
+        course_code varchar,
+        dean_decision boolean,
+        faculty_decision boolean,
+        adviser_decision boolean) as
+$function$
+declare
+sem integer;
+yr integer;
+begin
+    select semester, year from academic_data.semester into sem, yr;
+    return query execute format($dyn$select * from registrations.dean_tickets_%s_%s;$dyn$, yr, sem);
+end;
+$function$ language plpgsql;
 ------------------------------------------------------------------------------------------------------------------------------------------------
 -- used by admin to update tickets
-create or replace function admin_data.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) returns void as
+create or replace procedure admin_data.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) as
 $function$
 declare
 f_id varchar;
@@ -615,7 +650,7 @@ end;
 $function$ language plpgsql;
 
 -- used by faculty to update student's tickets
-create or replace function faculty_actions.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) returns void as
+create or replace procedure faculty_actions.update_ticket(stu_rollnumber varchar, course varchar,new_status boolean) as
 $function$
 declare
 f_id varchar;
@@ -645,7 +680,7 @@ end;
 $function$ language plpgsql;
 
 -- used by adviser to update student's tickets
-create or replace function adviser_actions.update_ticket(stu_rollnumber varchar, course varchar, new_status boolean) returns void as
+create or replace procedure adviser_actions.update_ticket(stu_rollnumber varchar, course varchar, new_status boolean) as
 $function$
 declare
 adv_id varchar;
@@ -656,7 +691,7 @@ begin
     select current_user into adv_id;
     select semester, year from academic_data.semester into sem, yr;
     tbl_name:=format('registrations.adviser_ticket_%s_%s_%s', adv_id, yr, sem);
-    execute format($dyn$update %s set status=%s where course_code='%s' and roll_number='%s';$dyn$, tbl_name, new_status, course, stu_rollnumber);
+    execute format($dyn$update %s set status=%L where course_code='%s' and roll_number='%s';$dyn$, tbl_name, new_status, course, stu_rollnumber);
     raise notice 'Status for % for course % changed to %',stu_rollnumber,course,new_status;
 end;
 $function$ language plpgsql;
@@ -664,20 +699,21 @@ $function$ language plpgsql;
 create or replace function calculate_cgpa(roll_number varchar) returns real as
 $fn$
 declare
-    total_credits real;
-    scored        real;
-    cgpa          real;
-    course_cred   real;
+    total_credits real:=0;
+    scored        real:=0;
+    cgpa          real:=0;
+    course_cred   real:=0;
     course        record;
 begin
     for course in execute ('select * from student_grades.student_' || roll_number || ';')
     loop
         if course.grade != 0 then
-            select credits from academic_data.course_catalog where course_code = course.course_code into course_cred;
-            scored := course_cred * course.grade;
+            select credits from academic_data.course_catalog where academic_data.course_catalog.course_code = course.course_code into course_cred;
+            scored := scored+course_cred * course.grade;
             total_credits := total_credits + course_cred;
         end if;
     end loop;
+   if total_credits=0 then return 0; end if;
     cgpa := (scored) / total_credits;
     return cgpa;
 end;
@@ -686,10 +722,10 @@ $fn$ language plpgsql;
 create or replace function calculate_cgpa() returns real as
 $fn$
 declare
-    total_credits real;
-    scored        real;
-    cgpa          real;
-    course_cred   real;
+    total_credits real:=0;
+    scored        real:=0;
+    cgpa          real:=0;
+    course_cred   real:=0;
     course        record;
     roll_number varchar;
 begin
@@ -697,11 +733,12 @@ begin
     for course in execute ('select * from student_grades.student_' || roll_number || ';')
     loop
         if course.grade != 0 then
-            select credits from academic_data.course_catalog where course_code = course.course_code into course_cred;
-            scored := course_cred * course.grade;
+            select credits from academic_data.course_catalog where academic_data.course_catalog.course_code = course.course_code into course_cred;
+            scored := scored+course_cred * course.grade;
             total_credits := total_credits + course_cred;
         end if;
     end loop;
+   if total_credits=0 then return 0; end if;
     cgpa := (scored) / total_credits;
     return cgpa;
 end;
@@ -729,6 +766,7 @@ begin
         raise notice 'Faculty % is not the course coordinator for course %. Kindly send the ticket to the right instructor.',f_id,new.course_id;
         return null;
     end if;
+   raise notice 'Ticket sent to faculty %', f_id;
     return new;
 end;
 $$ language plpgsql;
@@ -754,7 +792,7 @@ begin
     and academic_data.adviser_info.batch_dept=academic_data.student_info.department into adv_id;
 
     if advid!=adv_id then raise notice 'Ticket sent to wrong adviser'; return null; end if;
-
+    raise notice 'Ticket sent to faculty %', advid;
     return new;
 end;
 $$ language plpgsql;
@@ -797,7 +835,7 @@ begin
         course_code varchar,
         slot        varchar
     );
-    execute (format($d$copy admin_data.temp_timetable_slots from '%s' delimiter ',' csv header;$d$), file);
+    execute (format($d$copy admin_data.temp_timetable_slots from '%s' delimiter ',' csv header;$d$, file));
 
     for course_slot in select * from admin_data.temp_timetable_slots
         loop
@@ -832,7 +870,7 @@ begin
 end;
 $proc$ language plpgsql;
 
-create or replace procedure faculty_actions.upload_grades(grade_file text, course_name text) as
+create or replace procedure faculty_actions.upload_grades(course_name text, grade_file text) as
 $function$
 declare
     semester        integer;
@@ -984,7 +1022,7 @@ declare
 
 begin 
 	--1.check minimum of 5 CGPA
-	if student_cgpa < 5 then return false; end if;
+	if student_cgpa < 5 then raise notice 'Not ready to graduate. CGPA <5';return false; end if;
 
 	--2.check all core(program and science) courses done
 	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || student_roll_number || ''' ;' ) INTO student_batch, student_dept;
@@ -998,7 +1036,7 @@ begin
 				present = true;
 			end if;
 		end loop;
-		if present = false then return false; end if;
+		if present = false THEN raise notice 'Not ready to graduate. PC or SC not completed'; return false; end if;
 	end loop;
 	
 	--3.check elective (program and open) credits against acads limit
@@ -1190,6 +1228,11 @@ begin
     select semester, year
     from academic_data.semester
     into current_semester, current_year;
+   
+--    execute(format($d$select course_code from course_offerings.sem_%s_%s where course_code='%s';$d$, current_year, current_semester, course_code)) into course;
+--   	
+--   if course is null then raise notice 'Course not offered this semester.';return false;end if;
+   
     execute(format('select cgpa_req from course_offerings.sem_%s_%s where course_code=''%s'';',
         current_year, current_semester, course_code)) into required;
 
@@ -1269,13 +1312,20 @@ declare
    	student_batch integer;
    	student_dept varchar;
    	check_course record;
+   current_year integer;
+  current_semester integer;
 begin
     -- ensure prerequisites
 	SELECT current_user INTO curr_user;
+	select semester, year from academic_data.semester into current_semester, current_year;
 	IF curr_user!=NEW.roll_number THEN raise notice 'Permission denied. Invalid roll_number'; RETURN NULL; END IF;
 
 	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || curr_user || ''' ;' ) INTO student_batch, student_dept;
 	
+	execute(format($d$select course_code from course_offerings.sem_%s_%s where course_code='%s';$d$, current_year, current_semester, new.course_code)) into check_course;
+   	
+   	if check_course is null then raise notice 'Course not offered this semester.';return null;end if;
+
 	execute(format($d$select course_code from ug_curriculum.%s_%s where course_code='%s';$d$, student_dept, student_batch, new.course_code)) into check_course;
 	if check_course is null then
 	raise notice 'Course not in UG Curriculum';
@@ -1285,6 +1335,7 @@ begin
 --		raise notice 'Course not in UG Curriculum'
 --		RETURN NULL; 
 --	END IF;
+	
 
     flag := flag and check_prerequisites(new.roll_number, new.course_code);
     -- ensure allowed batch
@@ -1323,7 +1374,6 @@ begin
     -- will trigger the check above
 end;
 $func$;
-
 
 CREATE OR replace PROCEDURE raise_ticket(course_id text)
 LANGUAGE plpgsql

@@ -35,3 +35,11 @@ end;
 $f$language plpgsql;
 
 call admin_data.upload_batches('C:\Users\risha\Desktop\Assignments\CS301\Project\academic-portal-dbms\ug_batches.csv');
+call admin_data.upload_catalog('C:\Users\risha\Desktop\Assignments\CS301\Project\academic-portal-dbms\COURSE_CATALOG - Sheet1.csv');
+CALL ug_curriculum.create_batch_tables();
+CALL ug_curriculum.upload_curriculum('C:\Users\risha\Desktop\Assignments\CS301\Project\academic-portal-dbms\UG_curriculum_2019 - CSE.csv','cse',2019);
+CALL ug_curriculum.upload_curriculum('C:\Users\risha\Desktop\Assignments\CS301\Project\academic-portal-dbms\UG_curriculum_2018 - CSE.csv','cse',2018);
+
+
+
+
