@@ -60,17 +60,54 @@ $$
 DECLARE
 	current_year		integer;
 	current_semester	integer;
-	reg					record;
+	req					record;
 BEGIN
 	select semester, year from academic_data.semester into current_semester, current_year;
 
 	--1. delete entry from provisional course regisration(existance ensured by trigger)
-	FOR reg IN execute('select * from registrations.provisional_course_registrations_' || current_year || '_' || current_semester ||';')
-	loop
-		
-	END loop;
-	
 	--2. delete student entry from final course registration, if exists
+
+	for req in execute('select * from registrations.withdraw_course_' || current_year || '_' || current_semester || ';')
+	loop
+		execute('delete from registrations.provisional_course_registrations_' || current_year || '_' || current_semester || ' where roll_number = ''' || req.roll_number || ''' and course_code = ''' || req.course_code || ''';');
+		execute('delete from registrations.' || req.course_code || '_' || current_year || '_' || current_semester || ' where roll_number = ''' || req.roll_number || ''';');
+	end loop;
+	
+	
+END
+$$;
+
+CREATE OR replace procedure admin_data.cancel_tickets()
+LANGUAGE plpgsql
+AS
+$$
+DECLARE
+	current_year		integer;
+	current_semester	integer;
+	req					record;
+	coord_id			varchar;
+   	student_batch 		 integer;
+	student_dept 		 varchar;
+	adv_id 				 varchar;
+BEGIN
+	select semester, year from academic_data.semester into current_semester, current_year;
+	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || ' where course_code = ''' || course_id || ''';') INTO coord_id;
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = ''' || curr_user || ''';') INTO student_batch, student_dept;
+	execute('select adviser_f_id from academic_data.ug_batches where dept_name = ''' || student_dept || ''' and batch_year = ''' || student_batch || ''';') INTO adv_id;
+
+	--1. delete entry from faculty ticket table
+	--2. delete entry from adviser ticket table
+	--3. delete entry from dean ticket table, if exists
+
+	for req in execute('select * from registrations.drop_tickets_' || current_year || '_' || current_semester || ';')
+	loop
+		execute('delete from registrations.faculty_ticket_' || coord_id || '_' || current_year || '_' || current_semester || ' where roll_number = ''' || req.roll_number || ''' and course_code = ''' || req.course_code || ''';');
+		execute('delete from registrations.adviser_ticket_' || adv_id || '_' || current_year || '_' || current_semester || ' where roll_number = ''' || req.roll_number || ''' and course_code = ''' || req.course_code || ''';');
+		execute('delete from registrations.dean_tickets_' || current_year || '_' || current_semester || ' where roll_number = ''' || req.roll_number || ''' and course_code = ''' || req.course_code || ''';');
+	
+	end loop;
+	
+	
 END
 $$;
 
@@ -102,7 +139,7 @@ begin
 	--1. get faculty id from course_coordinator from course_offerings
 
 	select semester, year from academic_data.semester into current_semester, current_year;
-	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || 'where course_code = "' || new.course_code || '" into ' || coord_id || ';');
+	execute('select course_coordinator from course_offerings.sem_' || current_year || '_' || current_semester || ' where course_code = "' || course_id || '";') INTO coord_id;
 	
 	for ticket in execute('select * from registrations.faculty_ticket_' || coord_id || '_' || current_year || '_' || current_semester || ';')
 	loop
@@ -114,8 +151,8 @@ begin
 
 	--2. get adviser id from ug_batches(using dept name and year from roll number)
 
-	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || student_roll_number || '" into' || student_batch || ',' || student_dept || ';');
-	execute('select adviser_f_id from academic_data.ug_batches where dept_name = "' || student_dept || '" and batch_year = "' || student_batch || '" into' || adv_id || ';' );
+	execute('select batch_year, department from academic_data.student_info where academic_data.student_info.roll_number = "' || curr_user || '";') INTO student_batch, student_dept;
+	execute('select adviser_f_id from academic_data.ug_batches where dept_name = "' || student_dept || '" and batch_year = "' || student_batch || '";') INTO adv_id;
 
 	for ticket in execute('select * from registrations.adviser_ticket_' || adv_id || '_' || current_year || '_' || current_semester || ';')
 	loop
