@@ -1,4 +1,0 @@
-1. Reset database
-2. Run setup.sql 
-3. Run load members
-To Do: Write appropriate functions to
