@@ -120,7 +120,7 @@ Triggers:
 
 <hr>
 
-## Course_offerings:
+## course_offerings:
 
 |Table name|Attributes|Description|Permissions|
 |---|---|---|---|
@@ -129,7 +129,9 @@ Triggers:
 
 Trigger:
 - course_offering.trigger_sem_<academic_year>_<semester_number>: Calls
-course_offerings.create_registration_table. Trigger on course offerings table to create final registration table for the course entered. Grant of select and update is given to course instructors.
+course_offerings.create_
+
+tion_table. Trigger on course offerings table to create final registration table for the course entered. Grant of select and update is given to course instructors.
 
 <hr>
 
@@ -144,7 +146,7 @@ Routine:
 
 - generate_marksheet(): print all the courses taken and the grades received in them. For students, roll number is taken from the username while the dean and faculty can generate for all roll numbers.
 
-## Registrations
+## registrations
 
 |Table name|Attributes|Description|Permissions|
 |---|---|---|---|
@@ -158,7 +160,7 @@ Routine:
 
 <hr>
 
-## ug_Curriculum 
+## ug_curriculum 
 
 |Table name|Attributes|Description|Permissions|
 |---|---|---|---|
